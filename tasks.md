@@ -1,20 +1,20 @@
 # Plano de trabalho
 
-Este documento define a divisao de responsabilidades e os contratos de integracao do projeto Monolith Parking.
+Este documento define a divisão de responsabilidades e os contratos de integração do projeto Monolith Parking.
 
 ## Objetivo
 
-Construir um sistema de estacionamento inteligente para campus com simulacao de sensores, mensageria MQTT, persistencia em banco, API HTTP, regras de recomendacao, incidentes e visualizacao operacional.
+Construir um sistema de estacionamento inteligente para campus com simulação de sensores, mensageria MQTT, persistência em banco, API HTTP, regras de recomendação, incidentes e visualização operacional.
 
 ## Responsabilidades
 
-| Responsavel | Area | Entrega |
+| Responsável | Área | Entrega |
 | --- | --- | --- |
 | Roger | Simulador IoT/MQTT | Sensores virtuais, gateways, eventos e falhas simuladas |
-| Nicol | Backend MQTT | Subscriber, validacao de payload, idempotencia e ingestao |
-| Morgado | Banco de dados | Schema, seed, persistencia, consultas e relatorios |
-| Seisdedo | API e regras | Endpoints HTTP, recomendacoes e incidentes |
-| Will | Integracao | Docker, documentacao final, testes e demo |
+| Nicolas | Backend MQTT | Subscriber, validação de payload, idempotência e ingestão |
+| Morgado | Banco de dados | Schema, seed, persistência, consultas e relatórios |
+| Seisdedo | API e regras | Endpoints HTTP, recomendações e incidentes |
+| Will | Integração | Docker, documentação final, testes e demo |
 
 ## Contratos de dados
 
@@ -28,7 +28,7 @@ Estados: FREE, OCCUPIED
 
 ### Evento MQTT de vaga
 
-Topico:
+Tópico:
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
@@ -49,13 +49,13 @@ Payload:
 
 ### Status de gateway
 
-Topico:
+Tópico:
 
 ```txt
 campus/parking/sectors/<sectorId>/gateway/status
 ```
 
-Campos minimos:
+Campos mínimos:
 
 ```txt
 ts, sectorId, status, gatewayId/source
@@ -65,7 +65,7 @@ ts, sectorId, status, gatewayId/source
 
 Banco escolhido: PostgreSQL.
 
-Tabelas obrigatorias:
+Tabelas obrigatórias:
 
 ```txt
 spots
@@ -75,7 +75,7 @@ incidents
 recommendations_log
 ```
 
-Contrato tecnico completo: [backend/database/README.md](backend/database/README.md).
+Contrato técnico completo: [backend/database/README.md](backend/database/README.md).
 
 ## API HTTP prevista
 
@@ -89,15 +89,15 @@ GET /api/v1/incidents?status=open
 GET /api/v1/recommendation?fromSector=A
 ```
 
-## Regras obrigatorias
+## Regras obrigatórias
 
-### Recomendacao
+### Recomendação
 
 Regra `R-OP1`: se `occupancyRate >= 0.90`, recomendar outro setor com melhor disponibilidade.
 
 ### Incidentes
 
-Tipos minimos:
+Tipos mínimos:
 
 ```txt
 STUCK_OCCUPIED
@@ -120,19 +120,19 @@ simulador -> MQTT -> backend subscriber -> banco -> API -> dashboard/demo
 
 1. Sensores simulados publicam eventos.
 2. Backend MQTT valida payload e ignora duplicados por `eventId`.
-3. Banco grava historico em `spot_events` e atualiza `spots`.
+3. Banco grava histórico em `spot_events` e atualiza `spots`.
 4. Banco calcula snapshots e fornece consultas para API.
-5. API retorna mapa, setores, vagas livres, turnover, incidentes e recomendacoes.
+5. API retorna mapa, setores, vagas livres, turnover, incidentes e recomendações.
 6. Demo mostra fluxo completo e registros persistidos.
 
-## Criterios de aceite
+## Critérios de aceite
 
 - 90 vagas criadas no seed inicial.
-- Eventos duplicados nao alteram o estado duas vezes.
+- Eventos duplicados não alteram o estado duas vezes.
 - Estado atual da vaga fica em `spots`.
-- Historico completo fica em `spot_events`.
-- Ocupacao por setor fica disponivel em consulta e snapshot.
-- Turnover considera transicoes `FREE -> OCCUPIED`.
-- Recomendacoes ficam registradas em `recommendations_log`.
+- Histórico completo fica em `spot_events`.
+- Ocupação por setor fica disponível em consulta e snapshot.
+- Turnover considera transições `FREE -> OCCUPIED`.
+- Recomendações ficam registradas em `recommendations_log`.
 - Incidentes ficam registrados em `incidents`.
-- Todos os servicos usam os mesmos contratos de topico, payload, setor e vaga.
+- Todos os serviços usam os mesmos contratos de tópico, payload, setor e vaga.

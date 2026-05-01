@@ -1,16 +1,16 @@
 # Banco de dados
 
-Modulo responsavel pela persistencia do Monolith Parking.
+Módulo responsável pela persistência do Monolith Parking.
 
-## Decisao tecnica
+## Decisão técnica
 
 Banco escolhido: PostgreSQL.
 
-Motivos praticos:
+Motivos práticos:
 
-- suporte nativo a `jsonb` para payloads MQTT, evidencias e contexto de recomendacao;
-- boa concorrencia para ingestao MQTT, API e consultas;
-- execucao local via Docker e compatibilidade com banco remoto compartilhado;
+- suporte nativo a `jsonb` para payloads MQTT, evidências e contexto de recomendação;
+- boa concorrência para ingestão MQTT, API e consultas;
+- execução local via Docker e compatibilidade com banco remoto compartilhado;
 - schema SQL independente de ORM.
 
 ## Estrutura
@@ -45,57 +45,57 @@ backend/database/
     node-pg-client.mjs
 ```
 
-## Schema obrigatorio
+## Schema obrigatório
 
 | Tabela | Finalidade |
 | --- | --- |
 | `spots` | Estado atual de cada vaga |
-| `spot_events` | Historico bruto dos eventos recebidos |
-| `sector_snapshots` | Ocupacao agregada por setor e minuto |
-| `incidents` | Incidentes operacionais e evidencias |
-| `recommendations_log` | Historico de recomendacoes emitidas |
+| `spot_events` | Histórico bruto dos eventos recebidos |
+| `sector_snapshots` | Ocupação agregada por setor e minuto |
+| `incidents` | Incidentes operacionais e evidências |
+| `recommendations_log` | Histórico de recomendações emitidas |
 
-## Extensoes do modelo
+## Extensões do modelo
 
-| Area | Tabelas principais |
+| Área | Tabelas principais |
 | --- | --- |
-| Organizacao | `campuses`, `parking_facilities`, `sectors` |
+| Organização | `campuses`, `parking_facilities`, `sectors` |
 | IoT | `gateways`, `sensors`, `gateway_status_events` |
-| Operacao | `spot_sessions`, `maintenance_windows`, `operator_actions` |
-| Recomendacao | `recommendation_policies`, `recommendation_candidates` |
-| Previsao | `campus_events`, `sector_forecasts` |
-| Mapa e navegacao | `map_nodes`, `map_edges`, `route_templates`, `navigation_requests` |
-| Gamificacao | `app_users`, `achievement_catalog`, `user_achievements`, `engagement_events` |
+| Operação | `spot_sessions`, `maintenance_windows`, `operator_actions` |
+| Recomendação | `recommendation_policies`, `recommendation_candidates` |
+| Previsão | `campus_events`, `sector_forecasts` |
+| Mapa e navegação | `map_nodes`, `map_edges`, `route_templates`, `navigation_requests` |
+| Gamificação | `app_users`, `achievement_catalog`, `user_achievements`, `engagement_events` |
 
-## Funcoes de integracao
+## Funções de integração
 
-| Funcao | Uso |
+| Função | Uso |
 | --- | --- |
-| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotencia e atualiza estado atual |
-| `get_sector_occupancy(...)` | Retorna ocupacao atual por setor |
+| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotência e atualiza estado atual |
+| `get_sector_occupancy(...)` | Retorna ocupação atual por setor |
 | `get_free_spots(...)` | Lista vagas livres por setor |
-| `get_turnover_report(...)` | Calcula transicoes `FREE -> OCCUPIED` |
+| `get_turnover_report(...)` | Calcula transições `FREE -> OCCUPIED` |
 | `get_incidents(...)` | Lista incidentes filtrando por status e setor |
 | `open_incident(...)` | Abre incidente sem duplicar incidente aberto equivalente |
 | `close_incident(...)` | Fecha incidente |
-| `log_recommendation(...)` | Registra recomendacao simples |
-| `record_recommendation_decision(...)` | Registra recomendacao com politica e candidatos |
+| `log_recommendation(...)` | Registra recomendação simples |
+| `record_recommendation_decision(...)` | Registra recomendação com política e candidatos |
 | `register_gateway_status_event(...)` | Registra status de gateway |
-| `get_navigation_options(...)` | Retorna vagas livres com rota e pontuacao |
+| `get_navigation_options(...)` | Retorna vagas livres com rota e pontuação |
 
-Wrappers em portugues existem para facilitar apresentacao e consultas manuais.
+Wrappers em português existem para facilitar apresentação e consultas manuais.
 
 ## Ambiente
 
 | Contexto | Host | Arquivo base |
 | --- | --- | --- |
 | Scripts locais | `localhost:5432` | `.env.example` |
-| Servicos no Docker Compose | `postgres:5432` | `.env.docker.example` |
+| Serviços no Docker Compose | `postgres:5432` | `.env.docker.example` |
 | Banco remoto compartilhado | definido em `DATABASE_URL` | `.env.shared.example` |
 
 Contrato completo: [CONTRATO_AMBIENTE.md](CONTRATO_AMBIENTE.md).
 
-## Execucao local
+## Execução local
 
 ```powershell
 cd backend/database
@@ -127,7 +127,7 @@ npm run check:db
 npm run check:shared-access
 ```
 
-Senhas e URLs reais nao devem ser commitadas.
+Senhas e URLs reais não devem ser commitadas.
 
 ## Consultas de apoio
 

@@ -1,26 +1,26 @@
 # Monolith Parking
 
-Sistema de estacionamento inteligente para campus, com sensores simulados, eventos MQTT, persistencia historica, API HTTP, recomendacoes operacionais, incidentes e base para dashboard.
+Sistema de estacionamento inteligente para campus, com sensores simulados, eventos MQTT, persistência histórica, API HTTP, recomendações operacionais, incidentes e base para dashboard.
 
 ## Escopo do projeto
 
-O sistema acompanha 90 vagas distribuidas em tres setores (`A`, `B`, `C`). Cada vaga recebe eventos de estado (`FREE` ou `OCCUPIED`) publicados por gateways via MQTT. O backend valida e persiste os eventos, atualiza o estado atual, calcula ocupacao por setor e disponibiliza dados para API, relatorios e dashboard.
+O sistema acompanha 90 vagas distribuídas em três setores (`A`, `B`, `C`). Cada vaga recebe eventos de estado (`FREE` ou `OCCUPIED`) publicados por gateways via MQTT. O backend valida e persiste os eventos, atualiza o estado atual, calcula ocupação por setor e disponibiliza dados para API, relatórios e dashboard.
 
 ![Arquitetura](arquitetura.png)
 
-## Modulos
+## Módulos
 
-| Modulo | Responsavel | Status neste repositorio |
+| Módulo | Responsável | Status neste repositório |
 | --- | --- | --- |
 | Simulador IoT/MQTT | Roger | Contrato definido |
-| Ingestao MQTT | Nicol | Contrato definido |
+| Ingestão MQTT | Nicolas | Contrato definido |
 | Banco de dados | Morgado | Implementado em `backend/database` |
-| API HTTP, recomendacoes e incidentes | Seisdedo | Contrato definido |
-| Integracao, Docker e demo | Will | Contrato definido |
+| API HTTP, recomendações e incidentes | Seisdedo | Contrato definido |
+| Integração, Docker e demo | Will | Contrato definido |
 
 ## Contratos principais
 
-### Topicos MQTT
+### Tópicos MQTT
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
@@ -54,9 +54,9 @@ GET /api/v1/recommendation?fromSector=A
 
 ## Banco de dados
 
-O projeto usa PostgreSQL. A implementacao esta em [backend/database](backend/database/README.md).
+O projeto usa PostgreSQL. A implementação está em [backend/database](backend/database/README.md).
 
-Tabelas obrigatorias:
+Tabelas obrigatórias:
 
 - `spots`
 - `spot_events`
@@ -64,17 +64,17 @@ Tabelas obrigatorias:
 - `incidents`
 - `recommendations_log`
 
-O banco tambem inclui estruturas de apoio para gateways, sensores, sessoes de permanencia, politicas de recomendacao, rotas internas, navegacao e gamificacao.
+O banco também inclui estruturas de apoio para gateways, sensores, sessões de permanência, políticas de recomendação, rotas internas, navegação e gamificação.
 
-## Ambiente padrao
+## Ambiente padrão
 
 | Contexto | Host | Porta |
 | --- | --- | --- |
 | Scripts locais e ferramentas como DBeaver | `localhost` | `5432` |
-| Servicos dentro do Docker Compose | `postgres` | `5432` |
+| Serviços dentro do Docker Compose | `postgres` | `5432` |
 | Banco compartilhado do grupo | definido em `DATABASE_URL` | `5432` |
 
-O host remoto compartilhado nao esta embutido no repositorio. A URL real deve ser criada pelo grupo e compartilhada fora do Git.
+O host remoto compartilhado não fica embutido no repositório. A URL real deve ser criada pelo grupo e compartilhada fora do Git.
 
 ## Como rodar o banco local
 
@@ -87,7 +87,7 @@ npm run check:requirements
 npm run check:db
 ```
 
-## Documentacao
+## Documentação
 
 - [Plano de trabalho](tasks.md)
 - [Contrato do banco](backend/database/README.md)

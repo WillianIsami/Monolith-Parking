@@ -1,8 +1,8 @@
 # ERD do banco
 
-Diagrama conceitual das entidades principais. O schema fisico esta nos arquivos SQL em `init/`.
+Diagrama conceitual das entidades principais. O schema físico está nos arquivos SQL em `init/`.
 
-## Operacao principal
+## Operação principal
 
 ```mermaid
 erDiagram
@@ -64,7 +64,7 @@ erDiagram
   }
 ```
 
-## Recomendacao, previsao e navegacao
+## Recomendação, previsão e navegação
 
 ```mermaid
 erDiagram
