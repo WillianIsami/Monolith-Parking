@@ -1,0 +1,17 @@
+{
+  "name": "monolith-parking-database",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap:shared": "node scripts/bootstrap-shared-db.mjs",
+    "setup:shared-access": "node scripts/setup-shared-access.mjs",
+    "check:shared-access": "node scripts/check-shared-access.mjs",
+    "check:db": "node scripts/check-db-health.mjs",
+    "check:requirements": "node scripts/check-db-requirements.mjs",
+    "demo:db": "node examples/node-pg-client.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "pg": "^8.16.3"
+  }
+}
