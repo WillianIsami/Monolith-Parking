@@ -1,40 +1,41 @@
-# Plano de trabalho
+# Checklist técnico do projeto
 
-Este documento define a divisão de responsabilidades e os contratos de integração do projeto Monolith Parking.
+Este arquivo contém apenas o checklist técnico de aceite do MVP.
 
-## Objetivo
+## Requisitos implementados
 
-Construir um sistema de estacionamento inteligente para campus com simulação de sensores, mensageria MQTT, persistência em banco, API HTTP, regras de recomendação, incidentes e visualização operacional.
+- [x] Setores fixos `A`, `B`, `C`.
+- [x] 30 vagas por setor.
+- [x] 90 vagas criadas no seed inicial.
+- [x] Estados `FREE` e `OCCUPIED`.
+- [x] Simulador Node.js com sensores virtuais.
+- [x] 3 gateways virtuais, um por setor.
+- [x] Publicação MQTT de eventos de vaga.
+- [x] Publicação MQTT de status de gateway.
+- [x] Injeção de falhas `stuck_occupied`, `stuck_free` e `flapping`.
+- [x] Backend assina tópicos MQTT obrigatórios.
+- [x] Payload MQTT validado antes da persistência.
+- [x] Idempotência por `eventId`.
+- [x] Histórico persistido em `spot_events`.
+- [x] Estado atual persistido em `spots`.
+- [x] Snapshots persistidos em `sector_snapshots`.
+- [x] Incidentes persistidos em `incidents`.
+- [x] Recomendações persistidas em `recommendations_log`.
+- [x] API HTTP REST com endpoints obrigatórios.
+- [x] Relatório de rotatividade por transição `FREE -> OCCUPIED`.
+- [x] Recomendação quando `occupancyRate >= 0.90`.
+- [x] Docker Compose com Mosquitto, PostgreSQL, backend e simulador.
 
-## Responsabilidades
+## Contratos principais
 
-| Responsável | Área | Entrega |
-| --- | --- | --- |
-| Roger | Simulador IoT/MQTT | Sensores virtuais, gateways, eventos e falhas simuladas |
-| Nicolas | Backend MQTT | Subscriber, validação de payload, idempotência e ingestão |
-| Morgado | Banco de dados | Schema, seed, persistência, consultas e relatórios |
-| Seisdedo | API e regras | Endpoints HTTP, recomendações e incidentes |
-| Will | Integração | Docker, documentação final, testes e demo |
-
-## Contratos de dados
-
-### Setores e vagas
-
-```txt
-Setores: A, B, C
-Vagas: A-01..A-30, B-01..B-30, C-01..C-30
-Estados: FREE, OCCUPIED
-```
-
-### Evento MQTT de vaga
-
-Tópico:
+### Tópicos MQTT
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
+campus/parking/sectors/<sectorId>/gateway/status
 ```
 
-Payload:
+### Payload de evento
 
 ```json
 {
@@ -47,37 +48,7 @@ Payload:
 }
 ```
 
-### Status de gateway
-
-Tópico:
-
-```txt
-campus/parking/sectors/<sectorId>/gateway/status
-```
-
-Campos mínimos:
-
-```txt
-ts, sectorId, status, gatewayId/source
-```
-
-## Banco de dados
-
-Banco escolhido: PostgreSQL.
-
-Tabelas obrigatórias:
-
-```txt
-spots
-spot_events
-sector_snapshots
-incidents
-recommendations_log
-```
-
-Contrato técnico completo: [backend/database/README.md](backend/database/README.md).
-
-## API HTTP prevista
+### Endpoints obrigatórios
 
 ```txt
 GET /api/v1/map
@@ -88,51 +59,3 @@ GET /api/v1/reports/turnover?sectorId=A&from=...&to=...
 GET /api/v1/incidents?status=open
 GET /api/v1/recommendation?fromSector=A
 ```
-
-## Regras obrigatórias
-
-### Recomendação
-
-Regra `R-OP1`: se `occupancyRate >= 0.90`, recomendar outro setor com melhor disponibilidade.
-
-### Incidentes
-
-Tipos mínimos:
-
-```txt
-STUCK_OCCUPIED
-STUCK_FREE
-FLAPPING
-```
-
-Status:
-
-```txt
-open
-closed
-```
-
-## Fluxo esperado
-
-```txt
-simulador -> MQTT -> backend subscriber -> banco -> API -> dashboard/demo
-```
-
-1. Sensores simulados publicam eventos.
-2. Backend MQTT valida payload e ignora duplicados por `eventId`.
-3. Banco grava histórico em `spot_events` e atualiza `spots`.
-4. Banco calcula snapshots e fornece consultas para API.
-5. API retorna mapa, setores, vagas livres, turnover, incidentes e recomendações.
-6. Demo mostra fluxo completo e registros persistidos.
-
-## Critérios de aceite
-
-- 90 vagas criadas no seed inicial.
-- Eventos duplicados não alteram o estado duas vezes.
-- Estado atual da vaga fica em `spots`.
-- Histórico completo fica em `spot_events`.
-- Ocupação por setor fica disponível em consulta e snapshot.
-- Turnover considera transições `FREE -> OCCUPIED`.
-- Recomendações ficam registradas em `recommendations_log`.
-- Incidentes ficam registrados em `incidents`.
-- Todos os serviços usam os mesmos contratos de tópico, payload, setor e vaga.

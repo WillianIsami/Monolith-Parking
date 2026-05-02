@@ -1,19 +1,34 @@
 {
-  "name": "api-monolith-park",
+  "name": "monolith-parking",
   "version": "1.0.0",
-  "description": "",
-  "main": "api-park.js",
+  "description": "MVP de estacionamento inteligente com MQTT, HTTP REST, PostgreSQL, simulador de sensores e detecção de incidentes.",
+  "main": "src/index.js",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js",
+    "start:backend": "node src/index.js",
+    "start:simulator": "node simulator/index.js",
+    "dev": "nodemon src/index.js",
+    "dev:simulator": "nodemon simulator/index.js",
+    "check": "node scripts/check-project.js"
   },
-  "keywords": [],
+  "keywords": [
+    "mqtt",
+    "iot",
+    "parking",
+    "postgres",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "pg": "^8.20.0"
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "mqtt": "^5.14.1",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

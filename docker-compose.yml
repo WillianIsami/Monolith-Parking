@@ -1,27 +1,85 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15
-    container_name: parking_db
-    restart: always
+    image: postgres:16-alpine
+    container_name: monolith_parking_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-monolith_parking}
+      POSTGRES_USER: ${POSTGRES_USER:-parking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parking123}
+      TZ: UTC
+      PGTZ: UTC
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init:/docker-entrypoint-initdb.d:ro
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: monolith_parking_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    build: .
+    container_name: monolith_parking_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-parking}:${POSTGRES_PASSWORD:-parking123}@postgres:5432/${POSTGRES_DB:-monolith_parking}
+      PGSSLMODE: disable
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      INCIDENT_CHECK_INTERVAL_MS: ${INCIDENT_CHECK_INTERVAL_MS:-10000}
+      STUCK_OCCUPIED_MINUTES: ${STUCK_OCCUPIED_MINUTES:-390}
+      STUCK_FREE_MINUTES: ${STUCK_FREE_MINUTES:-720}
+      FLAPPING_WINDOW_MINUTES: ${FLAPPING_WINDOW_MINUTES:-1}
+      FLAPPING_THRESHOLD: ${FLAPPING_THRESHOLD:-5}
+    ports:
+      - "3000:3000"
+
+  simulator:
+    build: .
+    container_name: monolith_parking_simulator
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_started
+      backend:
+        condition: service_started
+    command: ["npm", "run", "start:simulator"]
+    environment:
+      SIMULATOR_PORT: 4000
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      SIMULATED_MINUTE_MS: ${SIMULATED_MINUTE_MS:-1000}
+      SIMULATOR_TICK_MS: ${SIMULATOR_TICK_MS:-1000}
+      GATEWAY_STATUS_INTERVAL_MS: ${GATEWAY_STATUS_INTERVAL_MS:-15000}
+    ports:
+      - "4000:4000"
 
   adminer:
-    image: adminer
-    container_name: parking_adminer
-    restart: always
+    image: adminer:4.8.1-standalone
+    container_name: monolith_parking_adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${ADMINER_PORT:-8080}:8080"
-    depends_on:
-      - postgres
+    profiles: ["admin"]
 
 volumes:
-  pgdata:
+  postgres_data:
