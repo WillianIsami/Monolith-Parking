@@ -1,17 +1,17 @@
 # Banco de dados
 
-Módulo responsável pela persistência do Monolith Parking.
+Modulo responsavel pela persistencia do MVP de Estacionamento Inteligente Campus.
 
-## Decisão técnica
+## Decisao tecnica
 
 Banco escolhido: PostgreSQL.
 
-Motivos práticos:
+Motivos:
 
-- suporte nativo a `jsonb` para payloads MQTT, evidências e contexto de recomendação;
-- boa concorrência para ingestão MQTT, API e consultas;
-- execução local via Docker e compatibilidade com banco remoto compartilhado;
-- schema SQL independente de ORM.
+- `jsonb` para payloads MQTT, evidencias de incidentes e contexto de recomendacao;
+- boa compatibilidade com Docker Compose e banco compartilhado;
+- constraints e funcoes SQL simples para garantir idempotencia e integridade;
+- sem ORM, mantendo o contrato SQL facil de demonstrar.
 
 ## Estrutura
 
@@ -19,20 +19,13 @@ Motivos práticos:
 backend/database/
   docker-compose.yml
   package.json
-  .env.example
-  .env.docker.example
-  .env.shared.example
-  .env.supabase.example
   init/
     001_schema.sql
     002_seed_spots.sql
-    003_advanced_platform.sql
-    004_seed_advanced.sql
-    005_dashboard_navigation_gamification.sql
-    006_seed_dashboard_gamification.sql
   queries/
     api_queries.sql
     integration_examples.sql
+    exemplos_ptbr.sql
     advanced_dashboard_queries.sql
     dashboard_gamificado.sql
   scripts/
@@ -45,57 +38,36 @@ backend/database/
     node-pg-client.mjs
 ```
 
-## Schema obrigatório
+## Tabelas
 
 | Tabela | Finalidade |
 | --- | --- |
+| `sectors` | Setores fixos A, B e C, capacidade e threshold operacional |
 | `spots` | Estado atual de cada vaga |
-| `spot_events` | Histórico bruto dos eventos recebidos |
-| `sector_snapshots` | Ocupação agregada por setor e minuto |
-| `incidents` | Incidentes operacionais e evidências |
-| `recommendations_log` | Histórico de recomendações emitidas |
+| `spot_events` | Historico bruto dos eventos de vaga recebidos via MQTT |
+| `gateway_status_events` | Historico de saude dos gateways recebido via MQTT |
+| `sector_snapshots` | Ocupacao agregada por setor e minuto |
+| `incidents` | Incidentes operacionais e evidencias |
+| `recommendations_log` | Historico de recomendacoes emitidas |
 
-## Extensões do modelo
+## Funcoes e views
 
-| Área | Tabelas principais |
+| Objeto | Uso |
 | --- | --- |
-| Organização | `campuses`, `parking_facilities`, `sectors` |
-| IoT | `gateways`, `sensors`, `gateway_status_events` |
-| Operação | `spot_sessions`, `maintenance_windows`, `operator_actions` |
-| Recomendação | `recommendation_policies`, `recommendation_candidates` |
-| Previsão | `campus_events`, `sector_forecasts` |
-| Mapa e navegação | `map_nodes`, `map_edges`, `route_templates`, `navigation_requests` |
-| Gamificação | `app_users`, `achievement_catalog`, `user_achievements`, `engagement_events` |
-
-## Funções de integração
-
-| Função | Uso |
-| --- | --- |
-| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotência e atualiza estado atual |
-| `get_sector_occupancy(...)` | Retorna ocupação atual por setor |
+| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotencia por `event_id` e atualiza `spots` |
+| `record_gateway_status(...)` | Persiste heartbeat/status dos gateways |
+| `get_sector_occupancy(...)` | Retorna ocupacao atual por setor |
 | `get_free_spots(...)` | Lista vagas livres por setor |
-| `get_turnover_report(...)` | Calcula transições `FREE -> OCCUPIED` |
+| `get_turnover_report(...)` | Calcula transicoes `FREE -> OCCUPIED` |
 | `get_incidents(...)` | Lista incidentes filtrando por status e setor |
 | `open_incident(...)` | Abre incidente sem duplicar incidente aberto equivalente |
 | `close_incident(...)` | Fecha incidente |
-| `log_recommendation(...)` | Registra recomendação simples |
-| `record_recommendation_decision(...)` | Registra recomendação com política e candidatos |
-| `register_gateway_status_event(...)` | Registra status de gateway |
-| `get_navigation_options(...)` | Retorna vagas livres com rota e pontuação |
+| `log_recommendation(...)` | Registra recomendacao operacional |
+| `v_current_map` | Mapa atual das vagas |
+| `v_sector_summary_current` | Resumo atual de ocupacao |
+| `v_gateway_current_status` | Ultimo status conhecido de cada gateway |
 
-Wrappers em português existem para facilitar apresentação e consultas manuais.
-
-## Ambiente
-
-| Contexto | Host | Arquivo base |
-| --- | --- | --- |
-| Scripts locais | `localhost:5432` | `.env.example` |
-| Serviços no Docker Compose | `postgres:5432` | `.env.docker.example` |
-| Banco remoto compartilhado | definido em `DATABASE_URL` | `.env.shared.example` |
-
-Contrato completo: [CONTRATO_AMBIENTE.md](CONTRATO_AMBIENTE.md).
-
-## Execução local
+## Execucao local
 
 ```powershell
 cd backend/database
@@ -116,8 +88,8 @@ docker compose --profile admin up -d
 
 1. Criar um PostgreSQL remoto.
 2. Copiar `.env.shared.example` ou `.env.supabase.example` para `.env`.
-3. Ajustar `DATABASE_URL` e `PGSSLMODE`.
-4. Aplicar schema e seeds.
+3. Ajustar `DATABASE_URL`, `DATABASE_ADMIN_URL` e `PGSSLMODE`.
+4. Aplicar schema e seed.
 
 ```powershell
 npm run bootstrap:shared
@@ -127,19 +99,4 @@ npm run check:db
 npm run check:shared-access
 ```
 
-Senhas e URLs reais não devem ser commitadas.
-
-## Consultas de apoio
-
-- [queries/api_queries.sql](queries/api_queries.sql)
-- [queries/integration_examples.sql](queries/integration_examples.sql)
-- [queries/advanced_dashboard_queries.sql](queries/advanced_dashboard_queries.sql)
-- [queries/dashboard_gamificado.sql](queries/dashboard_gamificado.sql)
-
-## Documentos relacionados
-
-- [REQUISITOS_BANCO.md](REQUISITOS_BANCO.md)
-- [MAPEAMENTO_BANCO.md](MAPEAMENTO_BANCO.md)
-- [ERD_BANCO.md](ERD_BANCO.md)
-- [GUIA_OPERACIONAL.md](GUIA_OPERACIONAL.md)
-- [CONTRATO_AMBIENTE.md](CONTRATO_AMBIENTE.md)
+Senhas e URLs reais nao devem ser commitadas.

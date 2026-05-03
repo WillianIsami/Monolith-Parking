@@ -1,34 +1,48 @@
--- MQTT ingestion persistence example
+-- Persistencia de evento MQTT com idempotencia por event_id.
 SELECT *
 FROM apply_spot_event(
-  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-4000-8000-000000000001',
   '2026-04-29T10:15:30Z',
   'A',
   'A-07',
   'OCCUPIED',
-  '{"eventId":"00000000-0000-0000-0000-000000000001","ts":"2026-04-29T10:15:30Z","sectorId":"A","spotId":"A-07","state":"OCCUPIED","source":"gateway"}'::jsonb
+  '{"eventId":"00000000-0000-4000-8000-000000000001","ts":"2026-04-29T10:15:30Z","sectorId":"A","spotId":"A-07","state":"OCCUPIED","source":"gateway"}'::jsonb
 );
 
--- Current occupancy for all sectors
+-- Repetir o mesmo event_id nao duplica spot_events.
 SELECT *
-FROM get_sector_occupancy(NULL::sector_code);
+FROM apply_spot_event(
+  '00000000-0000-4000-8000-000000000001',
+  '2026-04-29T10:15:30Z',
+  'A',
+  'A-07',
+  'OCCUPIED',
+  '{"eventId":"00000000-0000-4000-8000-000000000001","ts":"2026-04-29T10:15:30Z","sectorId":"A","spotId":"A-07","state":"OCCUPIED","source":"gateway"}'::jsonb
+);
 
--- Current occupancy for one sector
+-- Status de gateway.
+SELECT record_gateway_status(
+  now(),
+  'A',
+  'gateway-A',
+  'ONLINE',
+  'gateway',
+  '{"sectorId":"A","gatewayId":"gateway-A","status":"ONLINE","source":"gateway"}'::jsonb
+);
+
+-- Ocupacao atual para todos os setores.
 SELECT *
-FROM get_sector_occupancy('A');
+FROM get_sector_occupancy(NULL);
 
--- Open incident example
+-- Abrir incidente para demonstracao.
 SELECT open_incident(
-  '2026-04-29T11:00:00Z',
+  now(),
   'FLAPPING',
   'high',
   'A',
   'A-07',
-  '{"changesInOneMinute":5,"window":"2026-04-29T10:59:00Z/2026-04-29T11:00:00Z"}'::jsonb
+  '{"changesInOneMinute":5}'::jsonb
 );
 
--- Close incident example
-SELECT close_incident(
-  '00000000-0000-0000-0000-000000000099',
-  '2026-04-29T12:00:00Z'
-);
+-- Fechar incidente, se necessario.
+-- SELECT close_incident('<incident-id-aqui>'::uuid, now());

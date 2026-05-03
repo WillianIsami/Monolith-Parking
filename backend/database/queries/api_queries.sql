@@ -1,27 +1,13 @@
 -- GET /api/v1/map
-SELECT
-  spot_id,
-  sector_id,
-  current_state,
-  last_change_ts,
-  last_event_id
+SELECT spot_id, sector_id, current_state, last_change_ts, last_event_id
 FROM v_current_map;
 
 -- GET /api/v1/sectors
-SELECT
-  sector_id,
-  occupied_count,
-  free_count,
-  occupancy_rate
-FROM v_sector_summary_current;
+SELECT sector_id, occupied_count, free_count, occupancy_rate, last_update_ts
+FROM get_sector_occupancy(NULL);
 
 -- GET /api/v1/sectors/:sectorId/spots
-SELECT
-  spot_id,
-  sector_id,
-  current_state,
-  last_change_ts,
-  last_event_id
+SELECT spot_id, sector_id, current_state, last_change_ts, last_event_id
 FROM spots
 WHERE sector_id = 'A'
 ORDER BY spot_id;
@@ -40,14 +26,19 @@ FROM get_turnover_report(
 
 -- GET /api/v1/incidents?status=open
 SELECT *
-FROM get_incidents('open', NULL::sector_code);
+FROM get_incidents('open', NULL);
 
 -- GET /api/v1/recommendation?fromSector=A
--- Example logging after the API decides the best target sector.
+-- A API escolhe o melhor setor candidato e registra o resultado.
 SELECT log_recommendation(
-  '2026-04-29T10:20:00Z',
+  now(),
   'A',
   'B',
   'Sector A at 93% occupancy; Sector B has 12 free spots',
-  '{"occupancyRate":0.93,"candidateSectors":[{"sectorId":"B","freeCount":12},{"sectorId":"C","freeCount":5}]}'::jsonb
+  '{"origin":{"sectorId":"A","occupancyRate":0.93},"candidates":[{"sectorId":"B","freeCount":12},{"sectorId":"C","freeCount":5}]}'::jsonb
 );
+
+-- GET /api/v1/gateways
+SELECT sector_id, gateway_id, status, source, last_status_ts
+FROM v_gateway_current_status
+ORDER BY sector_id;

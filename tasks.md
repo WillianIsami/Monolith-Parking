@@ -1,6 +1,6 @@
-# Checklist técnico do projeto
+# Checklist tecnico do projeto
 
-Este arquivo contém apenas o checklist técnico de aceite do MVP.
+Checklist de aceite do MVP com base em `dist/prova_final_sprint_2.md`.
 
 ## Requisitos implementados
 
@@ -8,27 +8,30 @@ Este arquivo contém apenas o checklist técnico de aceite do MVP.
 - [x] 30 vagas por setor.
 - [x] 90 vagas criadas no seed inicial.
 - [x] Estados `FREE` e `OCCUPIED`.
-- [x] Simulador Node.js com sensores virtuais.
+- [x] Simulador Node.js com 90 sensores virtuais.
 - [x] 3 gateways virtuais, um por setor.
-- [x] Publicação MQTT de eventos de vaga.
-- [x] Publicação MQTT de status de gateway.
-- [x] Injeção de falhas `stuck_occupied`, `stuck_free` e `flapping`.
-- [x] Backend assina tópicos MQTT obrigatórios.
-- [x] Payload MQTT validado antes da persistência.
-- [x] Idempotência por `eventId`.
-- [x] Histórico persistido em `spot_events`.
+- [x] Padroes realistas de chegada com picos por horario.
+- [x] Permanencia variavel entre 30 minutos e 6 horas simuladas.
+- [x] Publicacao MQTT de eventos de vaga.
+- [x] Publicacao MQTT de status de gateway.
+- [x] Persistencia do status de gateway em `gateway_status_events`.
+- [x] Injecao de falhas `stuck_occupied`, `stuck_free` e `flapping`.
+- [x] Backend assina topicos MQTT obrigatorios.
+- [x] Payload MQTT validado antes da persistencia.
+- [x] Idempotencia por `eventId`.
+- [x] Historico persistido em `spot_events`.
 - [x] Estado atual persistido em `spots`.
 - [x] Snapshots persistidos em `sector_snapshots`.
 - [x] Incidentes persistidos em `incidents`.
-- [x] Recomendações persistidas em `recommendations_log`.
-- [x] API HTTP REST com endpoints obrigatórios.
-- [x] Relatório de rotatividade por transição `FREE -> OCCUPIED`.
-- [x] Recomendação quando `occupancyRate >= 0.90`.
+- [x] Recomendacoes persistidas em `recommendations_log`.
+- [x] API HTTP REST com endpoints obrigatorios.
+- [x] Relatorio de rotatividade por transicao `FREE -> OCCUPIED`.
+- [x] Recomendacao quando `occupancyRate >= 0.90`.
 - [x] Docker Compose com Mosquitto, PostgreSQL, backend e simulador.
 
 ## Contratos principais
 
-### Tópicos MQTT
+### Topicos MQTT
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
@@ -48,7 +51,7 @@ campus/parking/sectors/<sectorId>/gateway/status
 }
 ```
 
-### Endpoints obrigatórios
+### Endpoints obrigatorios
 
 ```txt
 GET /api/v1/map
@@ -58,4 +61,10 @@ GET /api/v1/sectors/:sectorId/free-spots?limit=10
 GET /api/v1/reports/turnover?sectorId=A&from=...&to=...
 GET /api/v1/incidents?status=open
 GET /api/v1/recommendation?fromSector=A
+```
+
+### Endpoint adicional de saude dos gateways
+
+```txt
+GET /api/v1/gateways
 ```
