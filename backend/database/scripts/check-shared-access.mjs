@@ -39,8 +39,8 @@ async function main() {
       await client.query(`
         SELECT log_recommendation(
           now(),
-          'A'::sector_code,
-          'B'::sector_code,
+          'A',
+          'B',
           'shared access smoke test',
           '{}'::jsonb
         )
@@ -73,8 +73,8 @@ async function main() {
         )
         VALUES (
           now(),
-          'A'::sector_code,
-          'B'::sector_code,
+          'A',
+          'B',
           'reader write should fail',
           '{}'::jsonb
         )

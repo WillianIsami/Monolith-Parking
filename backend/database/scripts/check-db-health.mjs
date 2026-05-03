@@ -26,10 +26,11 @@ async function main() {
   try {
     const [
       { rows: spotRows },
-      { rows: sessionRows },
-      { rows: healthRows },
-      { rows: navigationRows },
-      { rows: leaderboardRows }
+      { rows: sectorRows },
+      { rows: gatewayRows },
+      { rows: incidentRows },
+      { rows: recommendationRows },
+      { rows: eventRows }
     ] = await Promise.all([
       pool.query(`
         SELECT
@@ -39,57 +40,45 @@ async function main() {
         FROM spots
       `),
       pool.query(`
-        SELECT
-          COUNT(*)::integer AS total_sessions,
-          COUNT(*) FILTER (WHERE session_status = 'open')::integer AS open_sessions
-        FROM spot_sessions
-      `),
-      pool.query(`
-        SELECT
-          sector_id,
-          occupied_count,
-          free_count,
-          occupancy_rate,
-          open_incidents,
-          gateway_code,
-          connectivity_status
-        FROM v_sector_command_center
+        SELECT sector_id, occupied_count, free_count, occupancy_rate, last_update_ts
+        FROM get_sector_occupancy(NULL)
         ORDER BY sector_id
       `),
       pool.query(`
-        SELECT
-          id_vaga,
-          id_setor,
-          tempo_estimado_segundos,
-          pontuacao_navegacao
-        FROM obter_opcoes_navegacao(
-          'ENTRY_NORTH',
-          3,
-          NULL,
-          false
-        )
+        SELECT sector_id, gateway_id, status, last_status_ts
+        FROM v_gateway_current_status
+        ORDER BY sector_id
       `),
       pool.query(`
-        SELECT
-          nome_usuario,
-          pontos_totais,
-          nivel,
-          quantidade_conquistas
-        FROM vw_ranking_engajamento
+        SELECT status, type, COUNT(*)::integer AS total
+        FROM incidents
+        GROUP BY status, type
+        ORDER BY status, type
+      `),
+      pool.query(`
+        SELECT COUNT(*)::integer AS total_recommendations
+        FROM recommendations_log
+      `),
+      pool.query(`
+        SELECT event_id, ts, sector_id, spot_id, state
+        FROM spot_events
+        ORDER BY ts DESC
         LIMIT 5
       `)
     ]);
 
-    console.log('[check] resumo geral');
+    console.log('[check] resumo geral das vagas');
     console.table(spotRows);
-    console.log('[check] sessoes');
-    console.table(sessionRows);
-    console.log('[check] centro operacional');
-    console.table(healthRows);
-    console.log('[check] navegacao sugerida');
-    console.table(navigationRows);
-    console.log('[check] ranking gamificado');
-    console.table(leaderboardRows);
+    console.log('[check] ocupacao atual por setor');
+    console.table(sectorRows);
+    console.log('[check] status atual dos gateways');
+    console.table(gatewayRows);
+    console.log('[check] incidentes por status/tipo');
+    console.table(incidentRows);
+    console.log('[check] recomendacoes registradas');
+    console.table(recommendationRows);
+    console.log('[check] ultimos eventos MQTT persistidos');
+    console.table(eventRows);
   } finally {
     await pool.end();
   }

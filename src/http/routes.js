@@ -2,6 +2,7 @@ const express = require('express');
 const parkingService = require('../services/parkingService');
 const incidentService = require('../services/incidentService');
 const recommendationService = require('../services/recommendationService');
+const gatewayService = require('../services/gatewayService');
 const {
   normalizeSector,
   isValidSector,
@@ -41,6 +42,10 @@ router.get('/map', asyncHandler(async (_req, res) => {
 
 router.get('/sectors', asyncHandler(async (_req, res) => {
   res.json(await parkingService.getSectors());
+}));
+
+router.get('/gateways', asyncHandler(async (_req, res) => {
+  res.json(await gatewayService.getGatewayStatuses());
 }));
 
 router.get('/sectors/:sectorId/spots', validateSectorParam, asyncHandler(async (req, res) => {

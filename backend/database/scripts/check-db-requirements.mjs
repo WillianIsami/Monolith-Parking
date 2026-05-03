@@ -14,36 +14,14 @@ dotenv.config({ path: path.join(databaseRoot, '.env') });
 const { Pool } = pg;
 
 const requiredColumns = {
+  sectors: ['sector_id', 'capacity', 'occupancy_alert_threshold'],
   spots: ['spot_id', 'sector_id', 'current_state', 'last_change_ts', 'last_event_id'],
   spot_events: ['event_id', 'ts', 'sector_id', 'spot_id', 'state', 'raw_payload_json'],
   sector_snapshots: ['ts', 'sector_id', 'occupied_count', 'free_count', 'occupancy_rate'],
   incidents: ['id', 'ts_open', 'ts_close', 'type', 'severity', 'sector_id', 'spot_id', 'evidence_json', 'status'],
-  recommendations_log: ['ts', 'from_sector', 'recommended_sector', 'reason', 'data_json']
+  recommendations_log: ['id', 'ts', 'from_sector', 'recommended_sector', 'reason', 'data_json'],
+  gateway_status_events: ['id', 'ts', 'sector_id', 'gateway_id', 'status', 'source', 'raw_payload_json']
 };
-
-const advancedTables = [
-  'campuses',
-  'parking_facilities',
-  'sectors',
-  'gateways',
-  'sensors',
-  'gateway_status_events',
-  'spot_sessions',
-  'recommendation_policies',
-  'recommendation_candidates',
-  'maintenance_windows',
-  'operator_actions',
-  'campus_events',
-  'sector_forecasts',
-  'app_users',
-  'map_nodes',
-  'map_edges',
-  'route_templates',
-  'navigation_requests',
-  'achievement_catalog',
-  'user_achievements',
-  'engagement_events'
-];
 
 const requiredFunctions = [
   'apply_spot_event',
@@ -54,19 +32,13 @@ const requiredFunctions = [
   'open_incident',
   'close_incident',
   'log_recommendation',
-  'registrar_decisao_recomendacao',
-  'obter_opcoes_navegacao',
-  'registrar_solicitacao_navegacao',
-  'registrar_pontos_engajamento'
+  'record_gateway_status'
 ];
 
-const requiredConstraints = [
-  'fk_spots_sector',
-  'fk_spot_events_sector',
-  'fk_sector_snapshots_sector',
-  'fk_incidents_sector',
-  'fk_recommendations_log_from_sector',
-  'fk_recommendations_log_recommended_sector'
+const requiredViews = [
+  'v_current_map',
+  'v_sector_summary_current',
+  'v_gateway_current_status'
 ];
 
 function addResult(results, area, check, ok, details) {
@@ -92,24 +64,22 @@ async function main() {
 
   try {
     const requiredTables = Object.keys(requiredColumns);
-    const allTables = [...new Set([...requiredTables, ...advancedTables])];
-
     const { rows: tableRows } = await pool.query(
       `
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'public'
+          AND table_type = 'BASE TABLE'
           AND table_name = ANY($1)
       `,
-      [allTables]
+      [requiredTables]
     );
 
     const existingTables = new Set(tableRows.map((row) => row.table_name));
-
     for (const tableName of requiredTables) {
       addResult(
         results,
-        'required-schema',
+        'schema',
         `table:${tableName}`,
         existingTables.has(tableName),
         existingTables.has(tableName) ? 'tabela existe' : 'tabela ausente'
@@ -137,13 +107,55 @@ async function main() {
     for (const [tableName, columns] of Object.entries(requiredColumns)) {
       const existingColumns = columnsByTable.get(tableName) ?? new Set();
       const missingColumns = columns.filter((column) => !existingColumns.has(column));
-
       addResult(
         results,
-        'required-schema',
+        'schema',
         `columns:${tableName}`,
         missingColumns.length === 0,
         missingColumns.length === 0 ? 'colunas obrigatorias presentes' : `faltando: ${missingColumns.join(', ')}`
+      );
+    }
+
+    const { rows: viewRows } = await pool.query(
+      `
+        SELECT table_name
+        FROM information_schema.views
+        WHERE table_schema = 'public'
+          AND table_name = ANY($1)
+      `,
+      [requiredViews]
+    );
+
+    const existingViews = new Set(viewRows.map((row) => row.table_name));
+    for (const viewName of requiredViews) {
+      addResult(
+        results,
+        'views',
+        viewName,
+        existingViews.has(viewName),
+        existingViews.has(viewName) ? 'view disponivel' : 'view ausente'
+      );
+    }
+
+    const { rows: functionRows } = await pool.query(
+      `
+        SELECT DISTINCT p.proname AS function_name
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname = ANY($1)
+      `,
+      [requiredFunctions]
+    );
+
+    const existingFunctions = new Set(functionRows.map((row) => row.function_name));
+    for (const functionName of requiredFunctions) {
+      addResult(
+        results,
+        'functions',
+        functionName,
+        existingFunctions.has(functionName),
+        existingFunctions.has(functionName) ? 'funcao disponivel' : 'funcao ausente'
       );
     }
 
@@ -178,83 +190,31 @@ async function main() {
       `snapshots=${snapshotRows[0].total_snapshots}`
     );
 
-    const { rows: functionRows } = await pool.query(
-      `
-        SELECT DISTINCT p.proname AS function_name
-        FROM pg_proc p
-        JOIN pg_namespace n
-          ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public'
-          AND p.proname = ANY($1)
-      `,
-      [requiredFunctions]
-    );
-
-    const existingFunctions = new Set(functionRows.map((row) => row.function_name));
-    for (const functionName of requiredFunctions) {
-      addResult(
-        results,
-        'functions',
-        functionName,
-        existingFunctions.has(functionName),
-        existingFunctions.has(functionName) ? 'funcao disponivel' : 'funcao ausente'
-      );
-    }
-
-    for (const tableName of advancedTables) {
-      addResult(
-        results,
-        'advanced-platform',
-        `table:${tableName}`,
-        existingTables.has(tableName),
-        existingTables.has(tableName) ? 'tabela avancada existe' : 'tabela avancada ausente'
-      );
-    }
-
-    const { rows: constraintRows } = await pool.query(
-      `
-        SELECT conname
-        FROM pg_constraint
-        WHERE conname = ANY($1)
-      `,
-      [requiredConstraints]
-    );
-
-    const existingConstraints = new Set(constraintRows.map((row) => row.conname));
-    for (const constraintName of requiredConstraints) {
-      addResult(
-        results,
-        'integrity',
-        constraintName,
-        existingConstraints.has(constraintName),
-        existingConstraints.has(constraintName) ? 'fk presente' : 'fk ausente'
-      );
-    }
-
-    const { rows: navigationRows } = await pool.query(`
-      SELECT COUNT(*)::integer AS option_count
-      FROM obter_opcoes_navegacao('ENTRY_NORTH', 5, NULL, false)
+    const { rows: occupancyRows } = await pool.query(`
+      SELECT sector_id, occupied_count, free_count, occupancy_rate
+      FROM get_sector_occupancy(NULL)
+      ORDER BY sector_id
     `);
 
     addResult(
       results,
-      'gamification',
-      'navigation-options',
-      navigationRows[0].option_count > 0,
-      `opcoes=${navigationRows[0].option_count}`
+      'queries',
+      'sector-occupancy',
+      occupancyRows.length === 3,
+      `setores=${occupancyRows.length}`
     );
 
-    const { rows: leaderboardRows } = await pool.query(`
-      SELECT COUNT(*)::integer AS user_count
-      FROM vw_ranking_engajamento
+    const { rows: freeSpotRows } = await pool.query(`
+      SELECT COUNT(*)::integer AS free_sample_count
+      FROM get_free_spots('A', 10)
     `);
 
     addResult(
       results,
-      'gamification',
-      'leaderboard',
-      leaderboardRows[0].user_count > 0,
-      `usuarios=${leaderboardRows[0].user_count}`
+      'queries',
+      'free-spots',
+      freeSpotRows[0].free_sample_count >= 0,
+      `amostra=${freeSpotRows[0].free_sample_count}`
     );
 
     console.table(results);
@@ -266,7 +226,7 @@ async function main() {
       return;
     }
 
-    console.log('[requirements] banco atende aos requisitos obrigatorios e a camada avancada/gamificada.');
+    console.log('[requirements] banco atende aos requisitos obrigatorios do MVP.');
   } finally {
     await pool.end();
   }

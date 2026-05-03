@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS spot_events (
 CREATE INDEX IF NOT EXISTS idx_spot_events_sector_ts ON spot_events(sector_id, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_spot_events_spot_ts ON spot_events(spot_id, ts DESC);
 
+CREATE TABLE IF NOT EXISTS gateway_status_events (
+  id bigserial PRIMARY KEY,
+  ts timestamptz NOT NULL,
+  sector_id text NOT NULL REFERENCES sectors(sector_id),
+  gateway_id text NOT NULL,
+  status text NOT NULL CHECK (status IN ('ONLINE', 'OFFLINE', 'DEGRADED')),
+  source text NOT NULL DEFAULT 'gateway' CHECK (source IN ('gateway', 'sensor')),
+  raw_payload_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CHECK (gateway_id <> '')
+);
+
+CREATE INDEX IF NOT EXISTS idx_gateway_status_events_sector_ts
+  ON gateway_status_events(sector_id, ts DESC);
+
 CREATE TABLE IF NOT EXISTS sector_snapshots (
   ts timestamptz NOT NULL,
   sector_id text NOT NULL REFERENCES sectors(sector_id),
@@ -89,6 +103,17 @@ SELECT
 FROM spots s
 GROUP BY s.sector_id
 ORDER BY s.sector_id;
+
+CREATE OR REPLACE VIEW v_gateway_current_status AS
+SELECT DISTINCT ON (gse.sector_id)
+  gse.sector_id,
+  gse.gateway_id,
+  gse.status,
+  gse.source,
+  gse.ts AS last_status_ts,
+  gse.raw_payload_json
+FROM gateway_status_events gse
+ORDER BY gse.sector_id, gse.ts DESC, gse.id DESC;
 
 CREATE OR REPLACE FUNCTION get_sector_occupancy(p_sector_id text DEFAULT NULL)
 RETURNS TABLE (
@@ -182,13 +207,13 @@ BEGIN
     RETURN;
   END IF;
 
-  UPDATE spots
+  UPDATE spots s
   SET current_state = p_state,
       last_change_ts = p_ts,
       last_event_id = p_event_id
-  WHERE spot_id = p_spot_id
-    AND sector_id = p_sector_id
-    AND (last_change_ts IS NULL OR p_ts >= last_change_ts);
+  WHERE s.spot_id = p_spot_id
+    AND s.sector_id = p_sector_id
+    AND (s.last_change_ts IS NULL OR p_ts >= s.last_change_ts);
 
   GET DIAGNOSTICS v_spot_updated = ROW_COUNT;
 
@@ -219,6 +244,40 @@ AS $$
     AND s.current_state = 'FREE'
   ORDER BY s.spot_id
   LIMIT GREATEST(COALESCE(p_limit, 10), 1);
+$$;
+
+CREATE OR REPLACE FUNCTION get_incidents(
+  p_status text DEFAULT NULL,
+  p_sector_id text DEFAULT NULL
+)
+RETURNS TABLE (
+  id uuid,
+  ts_open timestamptz,
+  ts_close timestamptz,
+  type text,
+  severity text,
+  sector_id text,
+  spot_id text,
+  evidence_json jsonb,
+  status text
+)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    i.id,
+    i.ts_open,
+    i.ts_close,
+    i.type,
+    i.severity,
+    i.sector_id,
+    i.spot_id,
+    i.evidence_json,
+    i.status
+  FROM incidents i
+  WHERE (p_status IS NULL OR i.status = p_status)
+    AND (p_sector_id IS NULL OR i.sector_id = p_sector_id)
+  ORDER BY i.ts_open DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION get_turnover_report(
@@ -324,5 +383,42 @@ BEGIN
   RETURNING id INTO v_log_id;
 
   RETURN v_log_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION record_gateway_status(
+  p_ts timestamptz,
+  p_sector_id text,
+  p_gateway_id text,
+  p_status text,
+  p_source text DEFAULT 'gateway',
+  p_raw_payload_json jsonb DEFAULT '{}'::jsonb
+)
+RETURNS bigint
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_status_id bigint;
+BEGIN
+  IF p_sector_id NOT IN ('A', 'B', 'C') THEN
+    RAISE EXCEPTION 'Invalid sector_id: %', p_sector_id;
+  END IF;
+
+  IF p_status NOT IN ('ONLINE', 'OFFLINE', 'DEGRADED') THEN
+    RAISE EXCEPTION 'Invalid gateway status: %', p_status;
+  END IF;
+
+  INSERT INTO gateway_status_events(ts, sector_id, gateway_id, status, source, raw_payload_json)
+  VALUES (
+    p_ts,
+    p_sector_id,
+    p_gateway_id,
+    p_status,
+    COALESCE(p_source, 'gateway'),
+    COALESCE(p_raw_payload_json, '{}'::jsonb)
+  )
+  RETURNING id INTO v_status_id;
+
+  RETURN v_status_id;
 END;
 $$;

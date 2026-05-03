@@ -51,8 +51,12 @@ async function getIncidents({ status, sectorId } = {}) {
 
 async function getReferenceTimestamp() {
   const { rows } = await db.query(`
-    SELECT COALESCE(MAX(last_change_ts), now()) AS reference_ts
-    FROM spots
+    SELECT GREATEST(
+      COALESCE((SELECT MAX(last_change_ts) FROM spots), now()),
+      COALESCE((SELECT MAX(ts) FROM spot_events), now()),
+      COALESCE((SELECT MAX(ts) FROM gateway_status_events), now()),
+      now()
+    ) AS reference_ts
   `);
 
   return rows[0].reference_ts;
@@ -129,12 +133,12 @@ async function checkFlapping(referenceTs) {
      )
      SELECT spot_id,
             sector_id,
-            COUNT(*) FILTER (WHERE previous_state IS NULL OR state <> previous_state)::integer AS transitions,
+            COUNT(*) FILTER (WHERE previous_state IS NOT NULL AND state <> previous_state)::integer AS transitions,
             MIN(ts) AS first_event_ts,
             MAX(ts) AS last_event_ts
-     FROM recent
-     GROUP BY spot_id, sector_id
-     HAVING COUNT(*) FILTER (WHERE previous_state IS NULL OR state <> previous_state) >= $3`,
+    FROM recent
+    GROUP BY spot_id, sector_id
+    HAVING COUNT(*) FILTER (WHERE previous_state IS NOT NULL AND state <> previous_state) >= $3`,
     [referenceTs, config.flappingWindowMinutes, config.flappingThreshold]
   );
 

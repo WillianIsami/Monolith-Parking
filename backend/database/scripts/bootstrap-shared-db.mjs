@@ -15,15 +15,6 @@ const initDir = path.join(databaseRoot, 'init');
 
 dotenv.config({ path: path.join(databaseRoot, '.env') });
 
-const sqlFiles = [
-  '001_schema.sql',
-  '002_seed_spots.sql',
-  '003_advanced_platform.sql',
-  '004_seed_advanced.sql',
-  '005_dashboard_navigation_gamification.sql',
-  '006_seed_dashboard_gamification.sql'
-];
-
 async function main() {
   const connectionString = process.env.DATABASE_ADMIN_URL || process.env.DATABASE_URL;
 
@@ -41,6 +32,14 @@ async function main() {
   console.log('[bootstrap] conectado ao banco');
 
   try {
+    const sqlFiles = (await fs.readdir(initDir))
+      .filter((fileName) => fileName.endsWith('.sql'))
+      .sort();
+
+    if (sqlFiles.length === 0) {
+      throw new Error(`Nenhum arquivo .sql encontrado em ${initDir}`);
+    }
+
     for (const fileName of sqlFiles) {
       const filePath = path.join(initDir, fileName);
       const sql = await fs.readFile(filePath, 'utf8');

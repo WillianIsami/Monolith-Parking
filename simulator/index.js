@@ -99,12 +99,6 @@ function getArrivalProbability(hour) {
   return 0.008;
 }
 
-function getDepartureMultiplier(hour) {
-  if (hour >= 16 && hour <= 19) return 1.8;
-  if (hour >= 11 && hour <= 14) return 1.1;
-  return 1.0;
-}
-
 function randomStayMinutes() {
   return 30 + Math.floor(Math.random() * (360 - 30 + 1));
 }
@@ -129,8 +123,7 @@ function tickNormalSpot(spot) {
 
   if (spot.state === 'OCCUPIED') {
     const shouldLeaveByStay = spot.occupiedUntil && simulatedClock >= spot.occupiedUntil;
-    const randomDeparture = Math.random() < 0.006 * getDepartureMultiplier(hour);
-    if (shouldLeaveByStay || randomDeparture) {
+    if (shouldLeaveByStay) {
       spot.occupiedUntil = null;
       publishSpotEvent(spot, 'FREE');
     }
@@ -169,14 +162,19 @@ function startFlapping(spot) {
 
   let toggles = 0;
   const maxToggles = 8;
+  const baseTs = new Date(simulatedClock.getTime());
   const interval = setInterval(() => {
     const nextState = spot.state === 'FREE' ? 'OCCUPIED' : 'FREE';
-    const eventTs = new Date(simulatedClock.getTime() + toggles * 5000);
+    const eventTs = new Date(baseTs.getTime() + toggles * 5000);
     publishSpotEvent(spot, nextState, eventTs);
     toggles += 1;
 
-    if (toggles >= maxToggles && faults.get(spot.spotId)?.type !== 'flapping') {
+    if (toggles >= maxToggles) {
       clearInterval(interval);
+      const currentFault = faults.get(spot.spotId);
+      if (currentFault?.interval === interval) {
+        faults.set(spot.spotId, { type: 'flapping' });
+      }
     }
   }, 300);
 
@@ -194,8 +192,14 @@ function injectFault({ sectorId, spotId, type, ageMinutes }) {
   const previous = faults.get(spot.spotId);
   if (previous?.interval) clearInterval(previous.interval);
 
-  const backdatedTs = Number.isFinite(Number(ageMinutes)) && Number(ageMinutes) > 0
-    ? new Date(simulatedClock.getTime() - Number(ageMinutes) * 60_000)
+  const requestedAgeMinutes = Number(ageMinutes);
+  if (Number.isFinite(requestedAgeMinutes) && requestedAgeMinutes > 0 && spot.lastChangeTs) {
+    const minClockForAge = new Date(new Date(spot.lastChangeTs).getTime() + requestedAgeMinutes * 60_000 + 1000);
+    if (simulatedClock < minClockForAge) simulatedClock = minClockForAge;
+  }
+
+  const backdatedTs = Number.isFinite(requestedAgeMinutes) && requestedAgeMinutes > 0
+    ? new Date(simulatedClock.getTime() - requestedAgeMinutes * 60_000)
     : simulatedClock;
 
   if (type === 'stuck_occupied') {
@@ -212,11 +216,13 @@ function injectFault({ sectorId, spotId, type, ageMinutes }) {
     startFlapping(spot);
   }
 
+  publishGatewayStatus('ONLINE');
+
   return {
     sectorId: spot.sectorId,
     spotId: spot.spotId,
     type,
-    ageMinutes: ageMinutes ? Number(ageMinutes) : 0,
+    ageMinutes: requestedAgeMinutes > 0 ? requestedAgeMinutes : 0,
     ts: simulatedClock.toISOString()
   };
 }

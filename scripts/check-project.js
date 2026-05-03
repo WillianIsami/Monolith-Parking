@@ -7,6 +7,7 @@ const requiredFiles = [
   'backend/database/init/002_seed_spots.sql',
   'src/index.js',
   'src/mqtt/subscriber.js',
+  'src/services/gatewayService.js',
   'simulator/index.js',
   'mosquitto/mosquitto.conf',
   'README.md'

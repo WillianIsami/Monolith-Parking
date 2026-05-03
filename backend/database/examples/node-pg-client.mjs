@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -13,184 +14,106 @@ dotenv.config({ path: path.join(databaseRoot, '.env') });
 
 const { Pool } = pg;
 
-async function persistExampleEvent(pool) {
-  const query = `
-    SELECT *
-    FROM aplicar_evento_vaga(
-      $1::uuid,
-      $2::timestamptz,
-      $3::sector_code,
-      $4::text,
-      $5::spot_state,
-      $6::jsonb
-    )
-  `;
+async function persistSpotEvent(pool) {
+  const eventId = crypto.randomUUID();
+  const ts = new Date().toISOString();
+  const payload = {
+    eventId,
+    ts,
+    sectorId: 'A',
+    spotId: 'A-11',
+    state: 'OCCUPIED',
+    source: 'gateway'
+  };
 
-  const values = [
-    '00000000-0000-0000-0000-000000000011',
-    new Date().toISOString(),
-    'A',
-    'A-11',
-    'OCCUPIED',
-    JSON.stringify({
-      eventId: '00000000-0000-0000-0000-000000000011',
-      ts: new Date().toISOString(),
-      sectorId: 'A',
-      spotId: 'A-11',
-      state: 'OCCUPIED',
-      source: 'gateway',
-      sensorCode: 'SNS-A11'
-    })
-  ];
-
-  const { rows } = await pool.query(query, values);
-  console.log('[demo] evento persistido');
-  console.table(rows);
-}
-
-async function showOperationalCenter(pool) {
-  const { rows } = await pool.query(`
-    SELECT
-      id_setor,
-      nome_setor,
-      vagas_ocupadas,
-      vagas_livres,
-      taxa_ocupacao,
-      status_gateway,
-      incidentes_abertos,
-      taxa_ocupacao_prevista
-    FROM vw_centro_operacional_setores
-    ORDER BY id_setor
-  `);
-
-  console.log('[demo] centro operacional');
-  console.table(rows);
-}
-
-async function recordRecommendation(pool) {
   const { rows } = await pool.query(
     `
-      SELECT registrar_decisao_recomendacao(
-        now(),
-        $1::sector_code,
-        $2::sector_code,
+      SELECT *
+      FROM apply_spot_event(
+        $1::uuid,
+        $2::timestamptz,
         $3::text,
-        $4::numeric(5,4),
+        $4::text,
         $5::text,
-        $6::text,
-        $7::jsonb,
-        $8::jsonb
-      ) AS recommendation_log_id
+        $6::jsonb
+      )
     `,
-    [
-      'A',
-      'B',
-      'Setor A em sobrecarga operacional; Setor B oferece melhor equilibrio.',
-      0.9300,
-      'R-OP1',
-      'node-demo',
-      JSON.stringify([
-        {
-          sectorId: 'B',
-          freeCount: 14,
-          occupancyRate: 0.53,
-          distanceScore: 0.86,
-          rankingScore: 0.93,
-          reason: 'highest_free_count_then_priority'
-        },
-        {
-          sectorId: 'C',
-          freeCount: 9,
-          occupancyRate: 0.70,
-          distanceScore: 0.77,
-          rankingScore: 0.78,
-          reason: 'secondary_candidate'
-        }
-      ]),
-      JSON.stringify({
-        apiRoute: '/api/v1/recommendation',
-        strategy: 'highest_free_count_then_priority'
-      })
-    ]
+    [eventId, ts, 'A', 'A-11', 'OCCUPIED', JSON.stringify(payload)]
   );
 
-  console.log('[demo] recomendacao registrada');
+  console.log('[demo] evento de vaga persistido');
   console.table(rows);
 }
 
-async function showNavigationOptions(pool) {
-  const { rows } = await pool.query(`
-    SELECT
-      id_vaga,
-      id_setor,
-      distancia_metros,
-      tempo_estimado_segundos,
-      pontuacao_navegacao
-    FROM obter_opcoes_navegacao(
-      'ENTRY_CENTER',
-      5,
-      NULL,
-      false
-    )
-  `);
-
-  console.log('[demo] opcoes de navegacao');
-  console.table(rows);
-}
-
-async function registerNavigationAndPoints(pool) {
-  const navigation = await pool.query(
+async function recordGatewayHeartbeat(pool) {
+  const { rows } = await pool.query(
     `
-      SELECT registrar_solicitacao_navegacao(
+      SELECT record_gateway_status(
+        now(),
         $1::text,
         $2::text,
         $3::text,
         $4::text,
-        NULL,
         $5::jsonb
-      ) AS navigation_request_id
+      ) AS gateway_status_event_id
     `,
     [
-      'driver-demo-04',
-      'Nina Costa',
-      'ENTRY_CENTER',
-      'B-03',
+      'A',
+      'gateway-A',
+      'ONLINE',
+      'gateway',
       JSON.stringify({
-        channel: 'mobile-app',
-        mode: 'smart-gps'
+        sectorId: 'A',
+        gatewayId: 'gateway-A',
+        status: 'ONLINE',
+        source: 'gateway'
       })
     ]
   );
 
-  const navigationRequestId = navigation.rows[0]?.navigation_request_id;
+  console.log('[demo] status de gateway registrado');
+  console.table(rows);
+}
 
-  const points = await pool.query(
-    `
-      SELECT registrar_pontos_engajamento(
-        $1::text,
-        $2::text,
-        $3::engagement_event_type,
-        $4::integer,
-        $5::uuid,
-        $6::jsonb
-      ) AS engagement_event_id
-    `,
-    [
-      'driver-demo-04',
-      'Nina Costa',
-      'navigation_completed',
-      35,
-      navigationRequestId,
-      JSON.stringify({
-        reason: 'completed-smart-gps-route'
-      })
-    ]
-  );
+async function showMvpQueries(pool) {
+  const queries = [
+    {
+      label: 'ocupacao por setor',
+      sql: `
+        SELECT sector_id, occupied_count, free_count, occupancy_rate, last_update_ts
+        FROM get_sector_occupancy(NULL)
+        ORDER BY sector_id
+      `
+    },
+    {
+      label: 'vagas livres setor A',
+      sql: `
+        SELECT spot_id, sector_id, current_state
+        FROM get_free_spots('A', 10)
+      `
+    },
+    {
+      label: 'incidentes abertos',
+      sql: `
+        SELECT id, type, severity, sector_id, spot_id, status
+        FROM get_incidents('open', NULL)
+      `
+    },
+    {
+      label: 'gateways atuais',
+      sql: `
+        SELECT sector_id, gateway_id, status, last_status_ts
+        FROM v_gateway_current_status
+        ORDER BY sector_id
+      `
+    }
+  ];
 
-  console.log('[demo] navegacao registrada');
-  console.table(navigation.rows);
-  console.log('[demo] pontos registrados');
-  console.table(points.rows);
+  for (const query of queries) {
+    const { rows } = await pool.query(query.sql);
+    console.log(`[demo] ${query.label}`);
+    console.table(rows);
+  }
 }
 
 async function main() {
@@ -204,11 +127,9 @@ async function main() {
   });
 
   try {
-    await persistExampleEvent(pool);
-    await showOperationalCenter(pool);
-    await recordRecommendation(pool);
-    await showNavigationOptions(pool);
-    await registerNavigationAndPoints(pool);
+    await persistSpotEvent(pool);
+    await recordGatewayHeartbeat(pool);
+    await showMvpQueries(pool);
   } finally {
     await pool.end();
   }

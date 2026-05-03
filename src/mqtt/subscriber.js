@@ -2,6 +2,7 @@ const mqtt = require('mqtt');
 const config = require('../config');
 const { applySpotEvent } = require('../services/parkingService');
 const { checkIncidents } = require('../services/incidentService');
+const { recordGatewayStatus } = require('../services/gatewayService');
 
 const SPOT_EVENTS_TOPIC = 'campus/parking/sectors/+/spots/+/events';
 const GATEWAY_STATUS_TOPIC = 'campus/parking/sectors/+/gateway/status';
@@ -35,7 +36,12 @@ function startMqttSubscriber() {
     }
 
     if (topic.includes('/gateway/status')) {
-      console.log(`[MQTT] Gateway status recebido: ${JSON.stringify(payload)}`);
+      try {
+        await recordGatewayStatus(payload);
+        console.log(`[MQTT] Gateway status salvo: ${payload.sectorId}/${payload.gatewayId} -> ${payload.status}`);
+      } catch (error) {
+        console.warn(`[MQTT] Gateway status rejeitado em ${topic}: ${error.message}`);
+      }
       return;
     }
 
