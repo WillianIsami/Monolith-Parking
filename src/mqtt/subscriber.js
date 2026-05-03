@@ -45,16 +45,24 @@ function startMqttSubscriber() {
       return;
     }
 
+    let result;
     try {
-      const result = await applySpotEvent(payload);
-      if (result?.inserted_event) {
-        console.log(`[MQTT] Evento ${payload.eventId} salvo: ${payload.spotId} -> ${payload.state}`);
-      } else {
-        console.log(`[MQTT] Evento duplicado ignorado pelo banco: ${payload.eventId}`);
-      }
-      await checkIncidents();
+      result = await applySpotEvent(payload);
     } catch (error) {
       console.warn(`[MQTT] Evento rejeitado em ${topic}: ${error.message}`);
+      return;
+    }
+
+    if (result?.inserted_event) {
+      console.log(`[MQTT] Evento ${payload.eventId} salvo: ${payload.spotId} -> ${payload.state}`);
+    } else {
+      console.log(`[MQTT] Evento duplicado ignorado pelo banco: ${payload.eventId}`);
+    }
+
+    try {
+      await checkIncidents();
+    } catch (error) {
+      console.warn(`[INCIDENTS] Falha ao verificar incidentes apos evento ${payload.eventId}: ${error.message}`);
     }
   });
 

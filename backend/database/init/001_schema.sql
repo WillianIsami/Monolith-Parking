@@ -328,24 +328,13 @@ AS $$
 DECLARE
   v_incident_id uuid;
 BEGIN
-  SELECT i.id INTO v_incident_id
-  FROM incidents i
-  WHERE i.status = 'open'
-    AND i.type = p_type
-    AND i.sector_id = p_sector_id
-    AND COALESCE(i.spot_id, '') = COALESCE(p_spot_id, '')
-  LIMIT 1;
-
-  IF v_incident_id IS NOT NULL THEN
-    UPDATE incidents
-    SET evidence_json = COALESCE(p_evidence_json, '{}'::jsonb),
-        ts_open = LEAST(ts_open, p_ts_open)
-    WHERE id = v_incident_id;
-    RETURN v_incident_id;
-  END IF;
-
   INSERT INTO incidents(ts_open, type, severity, sector_id, spot_id, evidence_json, status)
   VALUES (p_ts_open, p_type, p_severity, p_sector_id, p_spot_id, COALESCE(p_evidence_json, '{}'::jsonb), 'open')
+  ON CONFLICT (type, sector_id, (COALESCE(spot_id, ''))) WHERE status = 'open'
+  DO UPDATE
+  SET evidence_json = EXCLUDED.evidence_json,
+      ts_open = LEAST(incidents.ts_open, EXCLUDED.ts_open),
+      severity = EXCLUDED.severity
   RETURNING id INTO v_incident_id;
 
   RETURN v_incident_id;
