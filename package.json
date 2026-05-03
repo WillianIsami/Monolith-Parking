@@ -10,7 +10,8 @@
     "start:simulator": "node simulator/index.js",
     "dev": "nodemon src/index.js",
     "dev:simulator": "nodemon simulator/index.js",
-    "check": "node scripts/check-project.js"
+    "check": "node scripts/check-project.js",
+    "smoke:e2e": "node scripts/smoke-e2e.js"
   },
   "keywords": [
     "mqtt",

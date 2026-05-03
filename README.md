@@ -61,17 +61,26 @@ Backend / Simulador
 
 ## Como rodar com Docker
 
-Crie o arquivo `.env` a partir do exemplo:
+Pre-requisitos:
+
+- Docker Desktop no Windows com integracao WSL 2 habilitada para a distro usada, ou Docker Engine no Linux.
+- Node.js 18+ se quiser rodar os checks locais fora dos containers.
+
+No Windows/PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+No Linux/WSL/bash:
 
 ```bash
 cp .env.example .env
-```
-
-Suba todos os servicos:
-
-```bash
 docker compose up --build
 ```
+
+Se o WSL mostrar `The command 'docker' could not be found`, abra o Docker Desktop no Windows e habilite `Settings > Resources > WSL Integration` para a sua distro. Depois feche e reabra o terminal WSL.
 
 Se ja existia um volume Postgres antigo deste projeto, recrie o banco para aplicar o schema atualizado:
 
@@ -95,9 +104,20 @@ Para subir com Adminer:
 docker compose --profile admin up --build
 ```
 
+## Como rodar com Podman
+
+Em Linux com Podman funcional:
+
+```bash
+cp .env.example .env
+podman compose up --build
+```
+
+Se estiver em WSL e aparecer erro parecido com `aardvark-dns failed to start: Failed to connect to bus`, o problema e do Podman rootless sem `systemd --user`/D-Bus na distro. Nesse caso, habilite systemd no WSL ou use Docker Desktop com integracao WSL para a demo. O projeto em si usa imagens e Compose compativeis com Podman; o simulador precisa ser iniciado pelo Compose porque ele sobrescreve o comando padrao do Dockerfile com `npm run start:simulator`.
+
 ## Como rodar manualmente
 
-O modo manual roda backend e simulador pelo Node.js local. O PostgreSQL e o Mosquitto ainda precisam estar disponiveis.
+O modo manual roda backend e simulador pelo Node.js local. O PostgreSQL e o Mosquitto ainda precisam estar disponiveis. Backend e simulador leem o arquivo `.env` da raiz do projeto via `dotenv`.
 
 1. Instale as dependencias:
 
@@ -105,7 +125,23 @@ O modo manual roda backend e simulador pelo Node.js local. O PostgreSQL e o Mosq
 npm install
 ```
 
-2. Suba somente a infraestrutura com Docker:
+2. Configure o `.env` da raiz, se ainda nao existir.
+
+Windows/PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Linux/WSL/bash:
+
+```bash
+cp .env.example .env
+```
+
+Os valores do `.env.example` ja apontam para PostgreSQL e Mosquitto locais em `localhost`. Edite o `.env` apenas se precisar trocar porta, credenciais ou URL de conexao.
+
+3. Suba somente a infraestrutura com Docker:
 
 ```bash
 docker compose up -d postgres mosquitto
@@ -113,9 +149,49 @@ docker compose up -d postgres mosquitto
 
 Esse comando inicializa o banco automaticamente com os arquivos em `backend/database/init`.
 
-3. Configure as variaveis no terminal do backend.
+4. Inicie o backend:
 
-PowerShell:
+```bash
+npm run start:backend
+```
+
+5. Em outro terminal, inicie o simulador:
+
+```bash
+npm run start:simulator
+```
+
+6. Se preferir usar PostgreSQL e Mosquitto instalados diretamente na maquina, aplique o schema antes de iniciar o backend:
+
+```bash
+psql "$DATABASE_URL" -f backend/database/init/001_schema.sql
+psql "$DATABASE_URL" -f backend/database/init/002_seed_spots.sql
+```
+
+### Sobrescrever variaveis pelo terminal
+
+O fluxo principal usa `.env`. Os comandos abaixo sao uma alternativa avancada para explicitar as variaveis usadas e sobrescrever valores sem editar arquivo local.
+
+Backend:
+
+| Variavel | Uso |
+| --- | --- |
+| `PORT` | Porta HTTP do backend |
+| `DATABASE_URL` | String de conexao PostgreSQL |
+| `PGSSLMODE` | Modo SSL do PostgreSQL |
+| `MQTT_BROKER_URL` | URL do broker MQTT |
+
+Linux/WSL/bash:
+
+```bash
+export PORT=3000
+export DATABASE_URL="postgresql://parking:parking123@localhost:5432/monolith_parking"
+export PGSSLMODE=disable
+export MQTT_BROKER_URL="mqtt://localhost:1883"
+npm run start:backend
+```
+
+Windows/PowerShell:
 
 ```powershell
 $env:PORT="3000"
@@ -125,21 +201,36 @@ $env:MQTT_BROKER_URL="mqtt://localhost:1883"
 npm run start:backend
 ```
 
-4. Em outro terminal, inicie o simulador:
+Simulador:
+
+| Variavel | Uso |
+| --- | --- |
+| `SIMULATOR_PORT` | Porta HTTP do simulador |
+| `MQTT_BROKER_URL` | URL do broker MQTT |
+| `SIMULATED_MINUTE_MS` | Duracao de 1 minuto simulado |
+| `SIMULATOR_TICK_MS` | Intervalo de tick da simulacao |
+| `GATEWAY_STATUS_INTERVAL_MS` | Intervalo de heartbeat dos gateways |
+
+Linux/WSL/bash:
+
+```bash
+export SIMULATOR_PORT=4000
+export MQTT_BROKER_URL="mqtt://localhost:1883"
+export SIMULATED_MINUTE_MS=1000
+export SIMULATOR_TICK_MS=1000
+export GATEWAY_STATUS_INTERVAL_MS=15000
+npm run start:simulator
+```
+
+Windows/PowerShell:
 
 ```powershell
 $env:SIMULATOR_PORT="4000"
 $env:MQTT_BROKER_URL="mqtt://localhost:1883"
 $env:SIMULATED_MINUTE_MS="1000"
 $env:SIMULATOR_TICK_MS="1000"
+$env:GATEWAY_STATUS_INTERVAL_MS="15000"
 npm run start:simulator
-```
-
-5. Se preferir usar PostgreSQL e Mosquitto instalados diretamente na maquina, aplique o schema antes de iniciar o backend:
-
-```bash
-psql "$DATABASE_URL" -f backend/database/init/001_schema.sql
-psql "$DATABASE_URL" -f backend/database/init/002_seed_spots.sql
 ```
 
 ## Contratos MQTT
@@ -277,31 +368,70 @@ curl "http://localhost:3000/api/v1/recommendation?fromSector=A"
 
 ## Checks
 
+Validacao estatica dos contratos principais da atividade:
+
 ```bash
 npm run check
 ```
 
-Com o banco rodando:
+Smoke test e2e com a stack ja rodando em `localhost:3000` e `localhost:4000`:
+
+```bash
+npm run smoke:e2e
+```
+
+Com o banco rodando, os checks do modulo `backend/database` tambem podem usar `.env`.
+
+Linux/WSL/bash:
 
 ```bash
 cd backend/database
+cp .env.example .env
+npm install
 npm run check:requirements
+npm run check:db
+```
+
+Windows/PowerShell:
+
+```powershell
+cd backend/database
+Copy-Item .env.example .env
+npm install
+npm run check:requirements
+npm run check:db
+```
+
+Alternativa avancada, sem editar `backend/database/.env`:
+
+Linux/WSL/bash:
+
+```bash
+DATABASE_URL="postgresql://parking:parking123@localhost:5432/monolith_parking" PGSSLMODE=disable npm run check:db
+```
+
+Windows/PowerShell:
+
+```powershell
+$env:DATABASE_URL="postgresql://parking:parking123@localhost:5432/monolith_parking"
+$env:PGSSLMODE="disable"
 npm run check:db
 ```
 
 ## Roteiro de demonstracao
 
 1. Rodar `docker compose up --build`.
-2. Mostrar logs do simulador publicando eventos MQTT.
-3. Mostrar logs do backend consumindo eventos MQTT.
-4. Acessar `GET /api/v1/map`.
-5. Acessar `GET /api/v1/sectors`.
-6. Acessar `GET /api/v1/gateways`.
-7. Injetar `flapping` ou `stuck_occupied` em uma vaga.
-8. Acessar `GET /api/v1/incidents?status=open`.
-9. Lotar o setor `A` com `POST /sim/fill-sector/A`.
-10. Acessar `GET /api/v1/recommendation?fromSector=A`.
-11. Conferir registros no banco em `spot_events`, `gateway_status_events`, `incidents` e `recommendations_log`.
+2. Rodar `npm run smoke:e2e` para validar o fluxo completo.
+3. Mostrar logs do simulador publicando eventos MQTT.
+4. Mostrar logs do backend consumindo eventos MQTT.
+5. Acessar `GET /api/v1/map`.
+6. Acessar `GET /api/v1/sectors`.
+7. Acessar `GET /api/v1/gateways`.
+8. Injetar `flapping` ou `stuck_occupied` em uma vaga.
+9. Acessar `GET /api/v1/incidents?status=open`.
+10. Lotar o setor `A` com `POST /sim/fill-sector/A`.
+11. Acessar `GET /api/v1/recommendation?fromSector=A`.
+12. Conferir registros no banco em `spot_events`, `gateway_status_events`, `incidents` e `recommendations_log`.
 
 ## Escopo atual
 

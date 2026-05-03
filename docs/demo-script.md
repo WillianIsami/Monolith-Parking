@@ -2,18 +2,38 @@
 
 1. Subir os servicos:
 
+Se ainda nao existir `.env`, copie o exemplo antes de subir a stack:
+
+```bash
+cp .env.example .env
+```
+
+No PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 ```bash
 docker compose up --build
 ```
 
-2. Conferir backend e simulador:
+No Windows com WSL, se `docker` nao existir dentro do terminal WSL, habilite a integracao da distro em `Docker Desktop > Settings > Resources > WSL Integration`.
+
+2. Rodar o smoke e2e automatizado:
+
+```bash
+npm run smoke:e2e
+```
+
+3. Conferir backend e simulador manualmente:
 
 ```bash
 curl http://localhost:3000/api/v1/health
 curl http://localhost:4000/health
 ```
 
-3. Mostrar mapa, setores e gateways:
+4. Mostrar mapa, setores e gateways:
 
 ```bash
 curl http://localhost:3000/api/v1/map
@@ -21,7 +41,7 @@ curl http://localhost:3000/api/v1/sectors
 curl http://localhost:3000/api/v1/gateways
 ```
 
-4. Injetar falha de flapping:
+5. Injetar falha de flapping:
 
 ```bash
 curl -X POST http://localhost:4000/sim/faults \
@@ -29,13 +49,13 @@ curl -X POST http://localhost:4000/sim/faults \
   -d '{"sectorId":"A","spotId":"A-07","type":"flapping"}'
 ```
 
-5. Conferir incidente:
+6. Conferir incidente:
 
 ```bash
 curl "http://localhost:3000/api/v1/incidents?status=open"
 ```
 
-6. Injetar sensor travado ocupado para demo rapida:
+7. Injetar sensor travado ocupado para demo rapida:
 
 ```bash
 curl -X POST http://localhost:4000/sim/faults \
@@ -43,13 +63,13 @@ curl -X POST http://localhost:4000/sim/faults \
   -d '{"sectorId":"A","spotId":"A-08","type":"stuck_occupied","ageMinutes":400}'
 ```
 
-7. Conferir incidente novamente:
+8. Conferir incidente novamente:
 
 ```bash
 curl "http://localhost:3000/api/v1/incidents?status=open"
 ```
 
-8. Lotar setor A:
+9. Lotar setor A:
 
 ```bash
 curl -X POST http://localhost:4000/sim/fill-sector/A \
@@ -57,15 +77,16 @@ curl -X POST http://localhost:4000/sim/fill-sector/A \
   -d '{"occupiedCount":28}'
 ```
 
-9. Conferir recomendacao:
+10. Conferir recomendacao:
 
 ```bash
 curl "http://localhost:3000/api/v1/recommendation?fromSector=A"
 ```
 
-10. Conferir banco, se desejar:
+11. Conferir banco, se desejar:
 
 ```bash
 cd backend/database
+cp .env.example .env
 npm run check:db
 ```
