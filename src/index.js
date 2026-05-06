@@ -1,5 +1,6 @@
 const config = require('./config');
 const createApp = require('./app');
+const logger = require('./utils/logger');
 const { waitForDatabase } = require('./database/client');
 const { startMqttSubscriber } = require('./mqtt/subscriber');
 const { checkIncidents } = require('./services/incidentService');
@@ -9,13 +10,13 @@ async function main() {
 
   const app = createApp();
   const server = app.listen(config.port, () => {
-    console.log(`[HTTP] API do Estacionamento Inteligente rodando na porta ${config.port}`);
+    logger.info(`[HTTP] API do Estacionamento Inteligente rodando na porta ${config.port}`);
   });
 
   const mqttClient = startMqttSubscriber();
 
   const interval = setInterval(() => {
-    checkIncidents().catch((error) => console.error('[INCIDENTS] Erro:', error.message));
+    checkIncidents().catch((error) => logger.error({ err: error }, '[INCIDENTS] Erro na checagem'));
   }, config.incidentCheckIntervalMs);
 
   function shutdown() {
@@ -29,6 +30,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('[BOOT] Falha ao iniciar aplicação:', error);
+  logger.fatal({ err: error }, '[BOOT] Falha ao iniciar aplicação');
   process.exit(1);
 });

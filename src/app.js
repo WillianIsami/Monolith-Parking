@@ -1,10 +1,17 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const pinoHttp = require('pino-http');
+const logger = require('./utils/logger');
 const routes = require('./http/routes');
 
 function createApp() {
   const app = express();
 
+  app.use(helmet());
+  app.use(compression());
+  app.use(pinoHttp({ logger }));
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 
@@ -24,7 +31,7 @@ function createApp() {
   });
 
   app.use((error, _req, res, _next) => {
-    console.error('[HTTP] Erro:', error);
+    logger.error({ err: error }, '[HTTP] Erro: ' + (error.message || 'Erro interno'));
     res.status(error.statusCode || 500).json({ error: error.message || 'Erro interno do servidor' });
   });
 

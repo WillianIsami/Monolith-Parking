@@ -1,5 +1,6 @@
 const db = require('../database/client');
 const config = require('../config');
+const logger = require('../utils/logger');
 
 function toIncident(row) {
   return {
@@ -174,7 +175,7 @@ async function checkIncidents() {
 
   const total = stuckOccupied + stuckFree + flapping;
   if (total > 0) {
-    console.log(`[INCIDENTS] Verificação concluída: ${total} ocorrência(s) detectada(s).`);
+    logger.info(`[INCIDENTS] Verificação concluída: ${total} ocorrência(s) detectada(s).`);
   }
 
   return { stuckOccupied, stuckFree, flapping, total };
