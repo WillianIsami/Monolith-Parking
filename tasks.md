@@ -1,8 +1,8 @@
-# Checklist tecnico do projeto
+# Checklist Técnico do Projeto
 
-Checklist de aceite do MVP com base em `dist/prova_final_sprint_2.md`.
+Checklist de aceite do MVP de estacionamento inteligente.
 
-## Requisitos implementados
+## Requisitos Implementados
 
 - [x] Setores fixos `A`, `B`, `C`.
 - [x] 30 vagas por setor.
@@ -10,35 +10,35 @@ Checklist de aceite do MVP com base em `dist/prova_final_sprint_2.md`.
 - [x] Estados `FREE` e `OCCUPIED`.
 - [x] Simulador Node.js com 90 sensores virtuais.
 - [x] 3 gateways virtuais, um por setor.
-- [x] Padroes realistas de chegada com picos por horario.
-- [x] Permanencia variavel entre 30 minutos e 6 horas simuladas.
-- [x] Publicacao MQTT de eventos de vaga.
-- [x] Publicacao MQTT de status de gateway.
-- [x] Persistencia do status de gateway em `gateway_status_events`.
-- [x] Injecao de falhas `stuck_occupied`, `stuck_free` e `flapping`.
-- [x] Backend assina topicos MQTT obrigatorios.
-- [x] Payload MQTT validado antes da persistencia.
-- [x] Idempotencia por `eventId`.
-- [x] Historico persistido em `spot_events`.
+- [x] Padrões realistas de chegada com picos por horário.
+- [x] Permanência variável entre 30 minutos e 6 horas simuladas.
+- [x] Publicação MQTT de eventos de vaga.
+- [x] Publicação MQTT de status de gateway.
+- [x] Persistência do status de gateway em `gateway_status_events`.
+- [x] Injeção de falhas `stuck_occupied`, `stuck_free` e `flapping`.
+- [x] Backend assina tópicos MQTT obrigatórios.
+- [x] Payload MQTT validado antes da persistência.
+- [x] Idempotência por `eventId`.
+- [x] Histórico persistido em `spot_events`.
 - [x] Estado atual persistido em `spots`.
 - [x] Snapshots persistidos em `sector_snapshots`.
 - [x] Incidentes persistidos em `incidents`.
-- [x] Recomendacoes persistidas em `recommendations_log`.
-- [x] API HTTP REST com endpoints obrigatorios.
-- [x] Relatorio de rotatividade por transicao `FREE -> OCCUPIED`.
-- [x] Recomendacao quando `occupancyRate >= 0.90`.
+- [x] Recomendações persistidas em `recommendations_log`.
+- [x] API HTTP REST com endpoints obrigatórios.
+- [x] Relatório de rotatividade por transição `FREE -> OCCUPIED`.
+- [x] Recomendação quando `occupancyRate >= 0.90`.
 - [x] Docker Compose com Mosquitto, PostgreSQL, backend e simulador.
 
-## Contratos principais
+## Contratos Principais
 
-### Topicos MQTT
+### Tópicos MQTT
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
 campus/parking/sectors/<sectorId>/gateway/status
 ```
 
-### Payload de evento
+### Payload de Evento
 
 ```json
 {
@@ -51,7 +51,7 @@ campus/parking/sectors/<sectorId>/gateway/status
 }
 ```
 
-### Endpoints obrigatorios
+### Endpoints Obrigatórios
 
 ```txt
 GET /api/v1/map
@@ -63,8 +63,22 @@ GET /api/v1/incidents?status=open
 GET /api/v1/recommendation?fromSector=A
 ```
 
-### Endpoint adicional de saude dos gateways
+### Endpoint Adicional de Saúde dos Gateways
 
 ```txt
 GET /api/v1/gateways
 ```
+
+## Responsabilidades por Área
+
+| Área | Entrega |
+| --- | --- |
+| Simulador | Sensores virtuais, gateways, padrões de ocupação e falhas injetáveis |
+| MQTT | Contratos de tópicos, publicação de eventos e heartbeat dos gateways |
+| Backend | Subscriber MQTT, validação, API REST e regras operacionais |
+| Banco | Schema PostgreSQL, persistência, idempotência, snapshots e logs |
+| Integração | Docker Compose, checks e smoke test do fluxo completo |
+
+## Critério de Pronto
+
+O MVP é considerado pronto quando `npm run check` passa, a stack sobe com `docker compose up --build` e o smoke test `npm run smoke:e2e` valida MQTT, HTTP, banco, incidentes e recomendação.

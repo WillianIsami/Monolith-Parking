@@ -1,13 +1,13 @@
-# Contrato de ambiente
+# Contrato de Ambiente
 
 Padrão de conexão para desenvolvimento local, Docker Compose e banco compartilhado.
 
-## Modos oficiais
+## Modos Oficiais
 
 | Modo | Uso | Host | Porta | Arquivo |
 | --- | --- | --- | --- | --- |
 | Local | Scripts, DBeaver, pgAdmin local | `localhost` | `5432` | `.env.example` |
-| Docker | Backend/API/simulador no mesmo Compose | `postgres` | `5432` | `.env.docker.example` |
+| Docker | Backend, API e simulador no mesmo Compose | `postgres` | `5432` | `.env.docker.example` |
 | Compartilhado | Time usando um PostgreSQL remoto | valor do provedor | `5432` | `.env.shared.example` |
 | Supabase | Time usando Supabase Postgres | pooler ou host direto | `5432` ou `6543` | `.env.supabase.example` |
 
@@ -35,7 +35,7 @@ Serviços dentro do mesmo Compose devem usar o host `postgres`, que é o nome do
 postgresql://parking:parking123@postgres:5432/monolith_parking
 ```
 
-## Banco compartilhado
+## Banco Compartilhado
 
 O repositório não contém host remoto real. O grupo deve provisionar um PostgreSQL e preencher:
 
@@ -80,3 +80,4 @@ Recomendação para o grupo:
 - Senhas reais não devem aparecer em Markdown.
 - Serviços devem ler `DATABASE_URL`.
 - Scripts deste módulo procuram `.env` em `backend/database`.
+- Após mudanças no schema, rode `npm run bootstrap:shared` para alinhar o banco remoto.

@@ -1,17 +1,17 @@
-# Banco de dados
+# Banco de Dados
 
-Modulo responsavel pela persistencia do MVP de Estacionamento Inteligente Campus.
+Módulo responsável pela persistência do MVP de estacionamento inteligente.
 
-## Decisao tecnica
+## Decisão Técnica
 
 Banco escolhido: PostgreSQL.
 
 Motivos:
 
-- `jsonb` para payloads MQTT, evidencias de incidentes e contexto de recomendacao;
-- boa compatibilidade com Docker Compose e banco compartilhado;
-- constraints e funcoes SQL simples para garantir idempotencia e integridade;
-- sem ORM, mantendo o contrato SQL facil de demonstrar.
+- suporte nativo a `jsonb` para payloads MQTT, evidências de incidentes e contexto de recomendação;
+- boa compatibilidade com Docker Compose, Supabase e outros provedores gerenciados;
+- constraints e funções SQL para manter idempotência e integridade perto dos dados;
+- integração simples com Node.js via `pg`, sem depender de ORM para a demonstração.
 
 ## Estrutura
 
@@ -42,32 +42,32 @@ backend/database/
 
 | Tabela | Finalidade |
 | --- | --- |
-| `sectors` | Setores fixos A, B e C, capacidade e threshold operacional |
+| `sectors` | Setores fixos `A`, `B` e `C`, capacidade e threshold operacional |
 | `spots` | Estado atual de cada vaga |
-| `spot_events` | Historico bruto dos eventos de vaga recebidos via MQTT |
-| `gateway_status_events` | Historico de saude dos gateways recebido via MQTT |
-| `sector_snapshots` | Ocupacao agregada por setor e minuto |
-| `incidents` | Incidentes operacionais e evidencias |
-| `recommendations_log` | Historico de recomendacoes emitidas |
+| `spot_events` | Histórico bruto dos eventos de vaga recebidos via MQTT |
+| `gateway_status_events` | Histórico de saúde dos gateways recebido via MQTT |
+| `sector_snapshots` | Ocupação agregada por setor e minuto |
+| `incidents` | Incidentes operacionais e evidências |
+| `recommendations_log` | Histórico de recomendações emitidas |
 
-## Funcoes e views
+## Funções e Views
 
 | Objeto | Uso |
 | --- | --- |
-| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotencia por `event_id` e atualiza `spots` |
+| `apply_spot_event(...)` | Persiste evento MQTT, garante idempotência por `event_id` e atualiza `spots` |
 | `record_gateway_status(...)` | Persiste heartbeat/status dos gateways |
-| `get_sector_occupancy(...)` | Retorna ocupacao atual por setor |
+| `get_sector_occupancy(...)` | Retorna ocupação atual por setor |
 | `get_free_spots(...)` | Lista vagas livres por setor |
-| `get_turnover_report(...)` | Calcula transicoes `FREE -> OCCUPIED` |
+| `get_turnover_report(...)` | Calcula transições `FREE -> OCCUPIED` |
 | `get_incidents(...)` | Lista incidentes filtrando por status e setor |
 | `open_incident(...)` | Abre incidente sem duplicar incidente aberto equivalente |
 | `close_incident(...)` | Fecha incidente |
-| `log_recommendation(...)` | Registra recomendacao operacional |
+| `log_recommendation(...)` | Registra recomendação operacional |
 | `v_current_map` | Mapa atual das vagas |
-| `v_sector_summary_current` | Resumo atual de ocupacao |
-| `v_gateway_current_status` | Ultimo status conhecido de cada gateway |
+| `v_sector_summary_current` | Resumo atual de ocupação |
+| `v_gateway_current_status` | Último status conhecido de cada gateway |
 
-## Execucao local
+## Execução Local
 
 ```powershell
 cd backend/database
@@ -84,12 +84,12 @@ Adminer local:
 docker compose --profile admin up -d
 ```
 
-## Banco compartilhado
+## Banco Compartilhado
 
-1. Criar um PostgreSQL remoto.
+1. Criar ou reutilizar um PostgreSQL remoto.
 2. Copiar `.env.shared.example` ou `.env.supabase.example` para `.env`.
 3. Ajustar `DATABASE_URL`, `DATABASE_ADMIN_URL` e `PGSSLMODE`.
-4. Aplicar schema e seed.
+4. Aplicar schema, seed e permissões.
 
 ```powershell
 npm run bootstrap:shared
@@ -99,4 +99,13 @@ npm run check:db
 npm run check:shared-access
 ```
 
-Senhas e URLs reais nao devem ser commitadas.
+O bootstrap é idempotente para o MVP atual: ele cria objetos ausentes e também atualiza bancos compartilhados criados antes da tabela de status dos gateways.
+
+## Papéis de Acesso
+
+| Papel | Uso |
+| --- | --- |
+| `parking_writer` | Backend, subscriber MQTT e scripts que precisam escrever |
+| `parking_reader` | Consultas, dashboards, BI e validações somente leitura |
+
+Senhas e URLs reais não devem ser commitadas. Compartilhe credenciais reais apenas em canal privado do grupo.

@@ -1,6 +1,8 @@
-# Guia operacional do banco
+# Guia Operacional do Banco
 
-## Fluxo local
+Este guia resume como manter o PostgreSQL local, Docker e compartilhado alinhados.
+
+## Fluxo Local
 
 ```powershell
 cd backend/database
@@ -11,17 +13,11 @@ npm run check:requirements
 npm run check:db
 ```
 
-Adminer:
-
-```powershell
-docker compose --profile admin up -d
-```
-
-## Fluxo com banco compartilhado
+## Fluxo Compartilhado
 
 ```powershell
 cd backend/database
-Copy-Item .env.shared.example .env
+Copy-Item .env.supabase.example .env
 npm install
 npm run bootstrap:shared
 npm run setup:shared-access
@@ -30,41 +26,31 @@ npm run check:db
 npm run check:shared-access
 ```
 
-O arquivo `.env` real deve ficar fora do Git.
+## Hosts por Ambiente
 
-## Hosts padrao
-
-| Uso | Host |
+| Ambiente | Host esperado |
 | --- | --- |
-| Scripts locais e ferramentas desktop | `localhost` |
-| Servicos no mesmo Docker Compose | `postgres` |
-| Ambiente compartilhado | valor definido em `DATABASE_URL` |
+| Ferramentas locais | `localhost` |
+| Serviços no mesmo Docker Compose | `postgres` |
+| Supabase ou provedor remoto | host/pooler informado pelo provedor |
 
-## Comandos NPM
+## Rotina de Validação
 
-| Comando | Descricao |
-| --- | --- |
-| `npm run bootstrap:shared` | Aplica os arquivos reais de `init/*.sql` em um banco existente |
-| `npm run setup:shared-access` | Cria/atualiza usuarios `parking_writer` e `parking_reader` |
-| `npm run check:shared-access` | Valida escrita do writer e leitura do reader |
-| `npm run check:requirements` | Verifica requisitos obrigatorios do MVP |
-| `npm run check:db` | Mostra resumo operacional do banco |
-| `npm run demo:db` | Executa um fluxo demonstrativo via Node.js |
+- Rode `npm run check:requirements` após qualquer alteração de schema.
+- Rode `npm run check:db` para ver estado de vagas, setores, gateways, incidentes e recomendações.
+- Rode `npm run check:shared-access` quando alterar credenciais ou permissões de `parking_writer` e `parking_reader`.
 
-## Integracao esperada
+## Integração com o Backend
 
-- Ingestao MQTT de vagas chama `apply_spot_event(...)`.
-- Ingestao MQTT de gateways chama `record_gateway_status(...)`.
-- API de mapa usa `v_current_map`.
-- API de setores usa `get_sector_occupancy(...)`.
-- API de vagas livres usa `get_free_spots(...)`.
-- API de turnover usa `get_turnover_report(...)`.
-- API de incidentes consulta `incidents`.
-- API de recomendacao registra decisoes em `recommendations_log`.
+- Ingestão MQTT de vagas chama `apply_spot_event(...)`.
+- Ingestão MQTT de gateways chama `record_gateway_status(...)`.
+- API de mapa e setores usa `get_sector_occupancy(...)` e `v_current_map`.
+- API de incidentes usa `incidents` e `get_incidents(...)`.
+- API de recomendação registra decisões em `recommendations_log`.
 
-## Checks antes da demo
+## Segurança
 
-- `docker compose ps` mostra o Postgres saudavel.
-- `npm run check:requirements` finaliza sem falhas.
-- `npm run check:db` retorna 90 vagas.
-- Consultas em `queries/api_queries.sql` executam sem erro.
+- Não committe `.env`.
+- Não publique senhas em Markdown.
+- Use `parking_writer` para serviços que escrevem.
+- Use `parking_reader` para consultas, dashboards e validações somente leitura.

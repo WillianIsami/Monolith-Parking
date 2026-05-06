@@ -29,7 +29,7 @@ curl -X POST http://localhost:4000/sim/faults \
   -d '{"sectorId":"A","spotId":"A-07","type":"flapping"}'
 ```
 
-## Injetar stuck_occupied para demo rapida
+## Injetar stuck_occupied para demo rápida
 
 ```bash
 curl -X POST http://localhost:4000/sim/faults \
@@ -37,7 +37,7 @@ curl -X POST http://localhost:4000/sim/faults \
   -d '{"sectorId":"A","spotId":"A-08","type":"stuck_occupied","ageMinutes":400}'
 ```
 
-## Injetar stuck_free para demo rapida
+## Injetar stuck_free para demo rápida
 
 ```bash
 curl -X POST http://localhost:4000/sim/faults \

@@ -1,14 +1,14 @@
-# Roteiro de demonstracao
+# Roteiro de Demonstração
 
-1. Subir os servicos:
+1. Subir os serviços:
 
-Se ainda nao existir `.env`, copie o exemplo antes de subir a stack:
+Se ainda não existir `.env`, copie o exemplo antes de subir a stack:
 
 ```bash
 cp .env.example .env
 ```
 
-No PowerShell, use:
+No PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
@@ -18,9 +18,9 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-No Windows com WSL, se `docker` nao existir dentro do terminal WSL, habilite a integracao da distro em `Docker Desktop > Settings > Resources > WSL Integration`.
+No Windows com WSL, se `docker` não existir dentro do terminal WSL, habilite a integração da distro em `Docker Desktop > Settings > Resources > WSL Integration`.
 
-2. Rodar o smoke e2e automatizado:
+2. Rodar o smoke test automatizado:
 
 ```bash
 npm run smoke:e2e
@@ -55,7 +55,7 @@ curl -X POST http://localhost:4000/sim/faults \
 curl "http://localhost:3000/api/v1/incidents?status=open"
 ```
 
-7. Injetar sensor travado ocupado para demo rapida:
+7. Injetar sensor travado ocupado para demo rápida:
 
 ```bash
 curl -X POST http://localhost:4000/sim/faults \
@@ -69,7 +69,7 @@ curl -X POST http://localhost:4000/sim/faults \
 curl "http://localhost:3000/api/v1/incidents?status=open"
 ```
 
-9. Lotar setor A:
+9. Lotar setor `A`:
 
 ```bash
 curl -X POST http://localhost:4000/sim/fill-sector/A \
@@ -77,7 +77,7 @@ curl -X POST http://localhost:4000/sim/fill-sector/A \
   -d '{"occupiedCount":28}'
 ```
 
-10. Conferir recomendacao:
+10. Conferir recomendação:
 
 ```bash
 curl "http://localhost:3000/api/v1/recommendation?fromSector=A"

@@ -11,11 +11,11 @@ Sensores virtuais
 
 ## Simulador
 
-O simulador Node.js cria 90 sensores virtuais e 3 gateways. Ele publica eventos de vaga e status dos gateways em topicos MQTT e tambem oferece endpoints HTTP para demo e injecao de falhas.
+O simulador Node.js cria 90 sensores virtuais e 3 gateways. Ele publica eventos de vaga e status dos gateways em tópicos MQTT e também oferece endpoints HTTP para demonstração e injeção de falhas.
 
 ## MQTT
 
-Topicos usados:
+Tópicos usados:
 
 ```txt
 campus/parking/sectors/<sectorId>/spots/<spotId>/events
@@ -26,31 +26,31 @@ campus/parking/sectors/<sectorId>/gateway/status
 
 O backend:
 
-- assina os topicos MQTT;
+- assina os tópicos MQTT;
 - valida o payload;
-- aplica idempotencia por `eventId`;
+- aplica idempotência por `eventId`;
 - atualiza o estado atual da vaga;
-- persiste historico;
+- persiste histórico;
 - registra status de gateways;
 - detecta incidentes;
-- gera recomendacoes por regra;
-- expoe a API HTTP REST.
+- gera recomendações por regra;
+- expõe a API HTTP REST.
 
 ## Banco
 
 O PostgreSQL armazena:
 
 - setores e vagas;
-- historico de eventos;
+- histórico de eventos;
 - status dos gateways;
-- snapshots de ocupacao;
+- snapshots de ocupação;
 - incidentes;
-- recomendacoes.
+- recomendações.
 
 ## API
 
-A API HTTP permite consultar mapa atual, disponibilidade por setor, vagas livres, turnover, incidentes, gateways e recomendacao operacional.
+A API HTTP permite consultar mapa atual, disponibilidade por setor, vagas livres, turnover, incidentes, gateways e recomendação operacional.
 
-## Fora do MVP atual
+## Fora do MVP Atual
 
-Dashboard web, app mobile, Swagger e modelos preditivos nao fazem parte desta entrega.
+Dashboard web, app mobile, Swagger e modelos preditivos não fazem parte desta entrega.
