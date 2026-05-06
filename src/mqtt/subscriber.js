@@ -1,5 +1,6 @@
 const mqtt = require('mqtt');
 const config = require('../config');
+const logger = require('../utils/logger');
 const { applySpotEvent } = require('../services/parkingService');
 const { checkIncidents } = require('../services/incidentService');
 const { recordGatewayStatus } = require('../services/gatewayService');
@@ -15,14 +16,14 @@ function startMqttSubscriber() {
   });
 
   client.on('connect', () => {
-    console.log(`[MQTT] Conectado em ${config.mqttBrokerUrl}`);
+    logger.info(`[MQTT] Conectado em ${config.mqttBrokerUrl}`);
     client.subscribe([SPOT_EVENTS_TOPIC, GATEWAY_STATUS_TOPIC], { qos: 1 }, (error) => {
       if (error) {
-        console.error('[MQTT] Erro ao assinar tópicos:', error.message);
+        logger.error({ err: error }, '[MQTT] Erro ao assinar tópicos');
         return;
       }
-      console.log(`[MQTT] Assinando ${SPOT_EVENTS_TOPIC}`);
-      console.log(`[MQTT] Assinando ${GATEWAY_STATUS_TOPIC}`);
+      logger.info(`[MQTT] Assinando ${SPOT_EVENTS_TOPIC}`);
+      logger.info(`[MQTT] Assinando ${GATEWAY_STATUS_TOPIC}`);
     });
   });
 
@@ -31,16 +32,16 @@ function startMqttSubscriber() {
     try {
       payload = JSON.parse(message.toString());
     } catch (error) {
-      console.warn(`[MQTT] JSON inválido em ${topic}: ${error.message}`);
+      logger.warn({ err: error }, `[MQTT] JSON inválido em ${topic}`);
       return;
     }
 
     if (topic.includes('/gateway/status')) {
       try {
         await recordGatewayStatus(payload);
-        console.log(`[MQTT] Gateway status salvo: ${payload.sectorId}/${payload.gatewayId} -> ${payload.status}`);
+        logger.info(`[MQTT] Gateway status salvo: ${payload.sectorId}/${payload.gatewayId} -> ${payload.status}`);
       } catch (error) {
-        console.warn(`[MQTT] Gateway status rejeitado em ${topic}: ${error.message}`);
+        logger.warn({ err: error }, `[MQTT] Gateway status rejeitado em ${topic}`);
       }
       return;
     }
@@ -49,25 +50,25 @@ function startMqttSubscriber() {
     try {
       result = await applySpotEvent(payload);
     } catch (error) {
-      console.warn(`[MQTT] Evento rejeitado em ${topic}: ${error.message}`);
+      logger.warn({ err: error }, `[MQTT] Evento rejeitado em ${topic}`);
       return;
     }
 
     if (result?.inserted_event) {
-      console.log(`[MQTT] Evento ${payload.eventId} salvo: ${payload.spotId} -> ${payload.state}`);
+      logger.info(`[MQTT] Evento ${payload.eventId} salvo: ${payload.spotId} -> ${payload.state}`);
     } else {
-      console.log(`[MQTT] Evento duplicado ignorado pelo banco: ${payload.eventId}`);
+      logger.info(`[MQTT] Evento duplicado ignorado pelo banco: ${payload.eventId}`);
     }
 
     try {
       await checkIncidents();
     } catch (error) {
-      console.warn(`[INCIDENTS] Falha ao verificar incidentes apos evento ${payload.eventId}: ${error.message}`);
+      logger.warn({ err: error }, `[INCIDENTS] Falha ao verificar incidentes apos evento ${payload.eventId}`);
     }
   });
 
-  client.on('reconnect', () => console.log('[MQTT] Tentando reconectar...'));
-  client.on('error', (error) => console.error('[MQTT] Erro:', error.message));
+  client.on('reconnect', () => logger.info('[MQTT] Tentando reconectar...'));
+  client.on('error', (error) => logger.error({ err: error }, '[MQTT] Erro'));
 
   return client;
 }

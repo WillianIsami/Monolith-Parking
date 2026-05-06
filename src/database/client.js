@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const config = require('../config');
+const logger = require('../utils/logger');
 
 const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -7,7 +8,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (error) => {
-  console.error('[DB] Pool error:', error.message);
+  logger.error({ err: error }, '[DB] Pool error');
 });
 
 async function query(text, params) {
@@ -18,10 +19,10 @@ async function waitForDatabase(maxAttempts = 30) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await query('SELECT 1');
-      console.log('[DB] Conexão com PostgreSQL OK.');
+      logger.info('[DB] Conexão com PostgreSQL OK.');
       return;
     } catch (error) {
-      console.warn(`[DB] Aguardando PostgreSQL (${attempt}/${maxAttempts}): ${error.message}`);
+      logger.warn({ err: error }, `[DB] Aguardando PostgreSQL (${attempt}/${maxAttempts})`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
