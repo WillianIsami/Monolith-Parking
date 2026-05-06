@@ -6,9 +6,14 @@ const crypto = require('crypto');
 
 const PORT = Number(process.env.SIMULATOR_PORT || 4000);
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
 const SIMULATED_MINUTE_MS = Number(process.env.SIMULATED_MINUTE_MS || 1000);
 const SIMULATOR_TICK_MS = Number(process.env.SIMULATOR_TICK_MS || SIMULATED_MINUTE_MS);
 const GATEWAY_STATUS_INTERVAL_MS = Number(process.env.GATEWAY_STATUS_INTERVAL_MS || 15000);
+const STARTUP_SYNC_RETRIES = Number(process.env.SIMULATOR_STARTUP_SYNC_RETRIES || 30);
+const STARTUP_SYNC_DELAY_MS = Number(process.env.SIMULATOR_STARTUP_SYNC_DELAY_MS || 1000);
+const MANUAL_SYNC_RETRIES = Number(process.env.SIMULATOR_MANUAL_SYNC_RETRIES || 3);
+const MANUAL_SYNC_DELAY_MS = Number(process.env.SIMULATOR_MANUAL_SYNC_DELAY_MS || 300);
 
 const SECTORS = ['A', 'B', 'C'];
 const STATES = ['FREE', 'OCCUPIED'];
@@ -24,6 +29,7 @@ const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
 });
 
 let simulatedClock = new Date();
+let lastBackendSyncTs = null;
 const spots = new Map();
 const faults = new Map();
 
@@ -101,6 +107,106 @@ function getArrivalProbability(hour) {
 
 function randomStayMinutes() {
   return 30 + Math.floor(Math.random() * (360 - 30 + 1));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function asyncHandler(handler) {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+}
+
+async function requestBackendMap() {
+  const response = await fetch(`${BACKEND_URL}/api/v1/map`);
+  if (!response.ok) {
+    throw new Error(`backend respondeu ${response.status}`);
+  }
+
+  return response.json();
+}
+
+function readBackendSnapshot(map) {
+  const backendSpots = [];
+  let maxLastChangeTs = null;
+
+  for (const sector of map?.sectors || []) {
+    for (const spot of sector.spots || []) {
+      const spotId = String(spot.spotId || '').trim().toUpperCase();
+      const sectorId = String(spot.sectorId || '').trim().toUpperCase();
+      const state = String(spot.state || '').trim().toUpperCase();
+
+      if (!spots.has(spotId) || !SECTORS.includes(sectorId) || !STATES.includes(state)) continue;
+
+      const parsedTs = spot.lastChangeTs ? new Date(spot.lastChangeTs) : null;
+      const lastChangeTs = parsedTs && !Number.isNaN(parsedTs.getTime()) ? parsedTs : null;
+
+      if (lastChangeTs && (!maxLastChangeTs || lastChangeTs > maxLastChangeTs)) {
+        maxLastChangeTs = lastChangeTs;
+      }
+
+      backendSpots.push({ spotId, sectorId, state, lastChangeTs });
+    }
+  }
+
+  return { backendSpots, maxLastChangeTs };
+}
+
+function advanceClockAfter(maxLastChangeTs) {
+  if (!maxLastChangeTs) return false;
+
+  const nextClock = new Date(maxLastChangeTs.getTime() + 60_000);
+  if (nextClock > simulatedClock) {
+    simulatedClock = nextClock;
+    return true;
+  }
+
+  return false;
+}
+
+function hydrateSpotsFromBackend(backendSpots) {
+  for (const backendSpot of backendSpots) {
+    const spot = spots.get(backendSpot.spotId);
+    if (!spot) continue;
+
+    spot.sectorId = backendSpot.sectorId;
+    spot.state = backendSpot.state;
+    spot.lastChangeTs = backendSpot.lastChangeTs ? backendSpot.lastChangeTs.toISOString() : null;
+    spot.occupiedUntil = backendSpot.state === 'OCCUPIED'
+      ? new Date(simulatedClock.getTime() + randomStayMinutes() * 60_000)
+      : null;
+  }
+}
+
+async function syncWithBackend({ attempts, delayMs, hydrateSpots = false, reason = 'sincronizacao' }) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const map = await requestBackendMap();
+      const { backendSpots, maxLastChangeTs } = readBackendSnapshot(map);
+      const clockAdvanced = advanceClockAfter(maxLastChangeTs);
+
+      if (hydrateSpots) {
+        hydrateSpotsFromBackend(backendSpots);
+      }
+
+      lastBackendSyncTs = new Date().toISOString();
+
+      const maxTsLabel = maxLastChangeTs ? maxLastChangeTs.toISOString() : 'sem eventos';
+      const clockLabel = clockAdvanced ? 'relogio avancado' : 'relogio mantido';
+      console.log(`[SIM] Backend sincronizado (${reason}): ${backendSpots.length} vagas, max=${maxTsLabel}, ${clockLabel} para ${simulatedClock.toISOString()}`);
+      return true;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await sleep(delayMs);
+    }
+  }
+
+  console.warn(`[SIM] Nao foi possivel sincronizar com ${BACKEND_URL} (${reason}): ${lastError?.message || 'erro desconhecido'}`);
+  return false;
 }
 
 function tickNormalSpot(spot) {
@@ -261,17 +367,26 @@ function fillSector(sectorId, occupiedCount = 27) {
 
 function resetSimulation() {
   for (const spotId of Array.from(faults.keys())) clearFault(spotId);
-  simulatedClock = new Date();
+
+  const wallClock = new Date();
+  simulatedClock = wallClock > simulatedClock
+    ? wallClock
+    : new Date(simulatedClock.getTime() + 60_000);
+
   for (const spot of spots.values()) {
     spot.occupiedUntil = null;
-    if (spot.state !== 'FREE') publishSpotEvent(spot, 'FREE');
-    else spot.lastChangeTs = null;
+    publishSpotEvent(spot, 'FREE');
   }
   publishGatewayStatus('ONLINE');
 }
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'parking-simulator', ts: simulatedClock.toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'parking-simulator',
+    ts: simulatedClock.toISOString(),
+    backendSyncTs: lastBackendSyncTs
+  });
 });
 
 app.get('/sim/state', (_req, res) => {
@@ -294,31 +409,44 @@ app.get('/sim/state', (_req, res) => {
   });
 });
 
-app.post('/sim/faults', (req, res, next) => {
-  try {
-    res.status(201).json(injectFault(req.body || {}));
-  } catch (error) {
-    next(error);
-  }
-});
+app.post('/sim/faults', asyncHandler(async (req, res) => {
+  await syncWithBackend({
+    attempts: MANUAL_SYNC_RETRIES,
+    delayMs: MANUAL_SYNC_DELAY_MS,
+    hydrateSpots: true,
+    reason: 'fault'
+  });
+
+  res.status(201).json(injectFault(req.body || {}));
+}));
 
 app.delete('/sim/faults/:spotId', (req, res) => {
   const spotId = clearFault(req.params.spotId);
   res.json({ spotId, removed: true });
 });
 
-app.post('/sim/fill-sector/:sectorId', (req, res, next) => {
-  try {
-    res.json(fillSector(req.params.sectorId, req.body?.occupiedCount));
-  } catch (error) {
-    next(error);
-  }
-});
+app.post('/sim/fill-sector/:sectorId', asyncHandler(async (req, res) => {
+  await syncWithBackend({
+    attempts: MANUAL_SYNC_RETRIES,
+    delayMs: MANUAL_SYNC_DELAY_MS,
+    hydrateSpots: true,
+    reason: 'fill-sector'
+  });
 
-app.post('/sim/reset', (_req, res) => {
+  res.json(fillSector(req.params.sectorId, req.body?.occupiedCount));
+}));
+
+app.post('/sim/reset', asyncHandler(async (_req, res) => {
+  await syncWithBackend({
+    attempts: MANUAL_SYNC_RETRIES,
+    delayMs: MANUAL_SYNC_DELAY_MS,
+    hydrateSpots: true,
+    reason: 'reset'
+  });
+
   resetSimulation();
   res.json({ reset: true, ts: simulatedClock.toISOString() });
-});
+}));
 
 app.use((error, _req, res, _next) => {
   res.status(error.statusCode || 500).json({ error: error.message || 'Erro interno do simulador' });
@@ -332,11 +460,28 @@ mqttClient.on('connect', () => {
 mqttClient.on('reconnect', () => console.log('[SIM] Reconectando ao broker MQTT...'));
 mqttClient.on('error', (error) => console.error('[SIM] MQTT erro:', error.message));
 
-createInitialSpots();
-setInterval(tickSimulation, SIMULATOR_TICK_MS);
-setInterval(() => publishGatewayStatus('ONLINE'), GATEWAY_STATUS_INTERVAL_MS);
+async function startSimulator() {
+  createInitialSpots();
 
-app.listen(PORT, () => {
-  console.log(`[SIM] Simulador rodando na porta ${PORT}`);
-  console.log(`[SIM] Tempo simulado: ${SIMULATED_MINUTE_MS}ms = 1 minuto simulado`);
+  await syncWithBackend({
+    attempts: STARTUP_SYNC_RETRIES,
+    delayMs: STARTUP_SYNC_DELAY_MS,
+    hydrateSpots: true,
+    reason: 'startup'
+  });
+
+  publishGatewayStatus('ONLINE');
+
+  setInterval(tickSimulation, SIMULATOR_TICK_MS);
+  setInterval(() => publishGatewayStatus('ONLINE'), GATEWAY_STATUS_INTERVAL_MS);
+
+  app.listen(PORT, () => {
+    console.log(`[SIM] Simulador rodando na porta ${PORT}`);
+    console.log(`[SIM] Tempo simulado: ${SIMULATED_MINUTE_MS}ms = 1 minuto simulado`);
+  });
+}
+
+startSimulator().catch((error) => {
+  console.error('[SIM] Falha ao iniciar simulador:', error.message);
+  process.exit(1);
 });

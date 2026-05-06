@@ -11,7 +11,29 @@ function createApp() {
 
   app.use(helmet());
   app.use(compression());
-  app.use(pinoHttp({ logger }));
+
+  app.get('/favicon.ico', (_req, res) => {
+    res.status(204).end();
+  });
+
+  app.use(pinoHttp({
+    logger,
+    serializers: {
+      req(req) {
+        return {
+          id: req.id,
+          method: req.method,
+          url: req.url,
+          remoteAddress: req.remoteAddress
+        };
+      },
+      res(res) {
+        return {
+          statusCode: res.statusCode
+        };
+      }
+    }
+  }));
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 

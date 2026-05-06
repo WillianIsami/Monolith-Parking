@@ -54,10 +54,12 @@ function startMqttSubscriber() {
       return;
     }
 
-    if (result?.inserted_event) {
-      logger.info(`[MQTT] Evento ${payload.eventId} salvo: ${payload.spotId} -> ${payload.state}`);
-    } else {
+    if (!result?.inserted_event) {
       logger.info(`[MQTT] Evento duplicado ignorado pelo banco: ${payload.eventId}`);
+    } else if (result.applied_to_current_state) {
+      logger.info(`[MQTT] Evento ${payload.eventId} salvo e aplicado: ${payload.spotId} -> ${payload.state}`);
+    } else {
+      logger.warn(`[MQTT] Evento ${payload.eventId} salvo no historico, mas ignorado no estado atual por timestamp antigo: ${payload.spotId} -> ${payload.state}`);
     }
 
     try {
