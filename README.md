@@ -286,3 +286,4 @@ npm run check:db
 ## Escopo do MVP
 
 Esta entrega cobre o fluxo operacional completo de sensores virtuais, MQTT, backend, banco, incidentes e recomendação por regra. Dashboard web, app mobile, Swagger e modelos preditivos ficam fora do escopo atual.
+ 
